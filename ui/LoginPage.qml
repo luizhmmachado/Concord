@@ -8,59 +8,96 @@ Rectangle {
     anchors.fill: parent
 
     signal goToRegister()
+    signal emailUnconfirmed()
 
-    Column {
+    Connections {
+        target: authController
+        function onEmailNotConfirmed() { emailUnconfirmed() }
+    }
+
+    Rectangle {
         anchors.centerIn: parent
-        width: 340
-        spacing: 16
+        width: 380
+        height: card.implicitHeight + 64
+        radius: Theme.radiusMedium
+        color: Theme.surface
+        border.width: 1
+        border.color: Theme.surfaceAlt
 
-        Text {
-            text: "Entrar no Concord"
-            color: Theme.textPrimary
-            font.pixelSize: 26
-            font.bold: true
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-        }
+        Column {
+            id: card
+            anchors.fill: parent
+            anchors.margins: 32
+            spacing: 18
 
-        AppTextField {
-            id: emailField
-            width: parent.width
-            placeholderText: "E-mail"
-        }
+            Text {
+                text: "Bem-vindo de volta"
+                color: Theme.textPrimary
+                font.pixelSize: 24
+                font.bold: true
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+            }
+            Text {
+                text: "Entre com seu e-mail ou usuário"
+                color: Theme.textSecondary
+                font.pixelSize: 13
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+            }
 
-        AppTextField {
-            id: passwordField
-            width: parent.width
-            placeholderText: "Senha"
-            echoMode: TextInput.Password
-        }
+            Column {
+                width: parent.width
+                spacing: 6
+                Text { text: "EMAIL OU USUÁRIO"; color: Theme.textSecondary; font.pixelSize: 11; font.bold: true }
+                AppTextField {
+                    id: identifierField
+                    width: parent.width
+                    placeholderText: "voce@exemplo.com ou usuario"
+                }
+            }
 
-        Text {
-            visible: authController.lastError.length > 0
-            text: authController.lastError
-            color: Theme.danger
-            width: parent.width
-            wrapMode: Text.WordWrap
-        }
+            Column {
+                width: parent.width
+                spacing: 6
+                Text { text: "SENHA"; color: Theme.textSecondary; font.pixelSize: 11; font.bold: true }
+                AppTextField {
+                    id: passwordField
+                    width: parent.width
+                    placeholderText: "Sua senha"
+                    echoMode: TextInput.Password
+                    onAccepted: loginButton.clicked()
+                }
+            }
 
-        AppButton {
-            width: parent.width
-            text: authController.busy ? "Entrando..." : "Entrar"
-            enabled: !authController.busy && emailField.text.length > 0 && passwordField.text.length > 0
-            onClicked: authController.signIn(emailField.text, passwordField.text)
-        }
+            Text {
+                visible: authController.lastError.length > 0
+                text: authController.lastError
+                color: Theme.danger
+                font.pixelSize: 12
+                width: parent.width
+                wrapMode: Text.WordWrap
+            }
 
-        Text {
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            text: "<a href='#'>Criar uma conta</a>"
-            color: Theme.textSecondary
-            onLinkActivated: goToRegister()
+            AppButton {
+                id: loginButton
+                width: parent.width
+                text: authController.busy ? "Entrando..." : "Entrar"
+                enabled: !authController.busy && identifierField.text.length > 0 && passwordField.text.length > 0
+                onClicked: authController.signIn(identifierField.text, passwordField.text)
+            }
 
-            MouseArea {
-                anchors.fill: parent
-                onClicked: goToRegister()
+            Text {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                text: "Não tem uma conta? <b>Criar conta</b>"
+                color: Theme.textSecondary
+                font.pixelSize: 13
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: goToRegister()
+                }
             }
         }
     }

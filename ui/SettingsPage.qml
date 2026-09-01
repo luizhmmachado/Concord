@@ -42,7 +42,7 @@ Rectangle {
         RowLayout {
             spacing: 8
             Repeater {
-                model: ["#5865F2", "#23A55A", "#EB459E", "#F0B232", "#DA373C"]
+                model: ["#1FD1C1", "#5865F2", "#23A55A", "#EB459E", "#F0B232", "#DA373C"]
                 delegate: Rectangle {
                     width: 32; height: 32; radius: 16
                     color: modelData

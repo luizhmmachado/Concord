@@ -14,6 +14,7 @@ class AuthController : public QObject
     Q_PROPERTY(QString displayName READ displayName NOTIFY profileChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY lastErrorChanged)
+    Q_PROPERTY(QString pendingConfirmationEmail READ pendingConfirmationEmail NOTIFY pendingConfirmationEmailChanged)
 
 public:
     explicit AuthController(SupabaseClient *client, QObject *parent = nullptr);
@@ -24,19 +25,25 @@ public:
     QString displayName() const { return m_displayName; }
     bool busy() const { return m_busy; }
     QString lastError() const { return m_lastError; }
+    QString pendingConfirmationEmail() const { return m_pendingConfirmationEmail; }
 
     Q_INVOKABLE void signUp(const QString &email, const QString &password, const QString &username, const QString &displayName);
-    Q_INVOKABLE void signIn(const QString &email, const QString &password);
+    // Accepts either an e-mail address or a username as `identifier`.
+    Q_INVOKABLE void signIn(const QString &identifier, const QString &password);
     Q_INVOKABLE void signOut();
     Q_INVOKABLE void tryRestoreSession();
+    Q_INVOKABLE void resendConfirmationEmail();
 
 signals:
     void authenticatedChanged();
     void profileChanged();
     void busyChanged();
     void lastErrorChanged();
+    void pendingConfirmationEmailChanged();
     void signUpSucceeded();
     void signInSucceeded();
+    void confirmationEmailResent();
+    void emailNotConfirmed();
 
 private:
     void setBusy(bool busy);
@@ -49,6 +56,8 @@ private:
     bool m_busy = false;
     QString m_lastError;
     QString m_profileRequestId;
+    QString m_pendingConfirmationEmail;
+    QString m_pendingPassword;
 };
 
 #endif // AUTHCONTROLLER_H

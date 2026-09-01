@@ -120,6 +120,21 @@ void SupabaseClient::refreshSession()
     });
 }
 
+void SupabaseClient::resendConfirmationEmail(const QString &email)
+{
+    QUrl url(m_projectUrl + "/auth/v1/resend");
+    QNetworkRequest request = buildRequest(url, false);
+
+    const QJsonObject body{{"type", "signup"}, {"email", email}};
+    QNetworkReply *reply = m_manager->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        const QByteArray data = reply->readAll();
+        const bool ok = reply->error() == QNetworkReply::NoError;
+        emit resendConfirmationFinished(ok, ok ? QString() : QString::fromUtf8(data));
+        reply->deleteLater();
+    });
+}
+
 void SupabaseClient::select(const QString &tableAndQuery, const QString &tag)
 {
     const QString requestId = tag.isEmpty() ? QUuid::createUuid().toString(QUuid::WithoutBraces) : tag;
@@ -185,3 +200,26 @@ void SupabaseClient::remove(const QString &tableAndQuery, const QString &tag)
         reply->deleteLater();
     });
 }
+
+void SupabaseClient::rpc(const QString &functionName, const QJsonObject &params, const QString &tag)
+{
+    const QString requestId = tag.isEmpty() ? QUuid::createUuid().toString(QUuid::WithoutBraces) : tag;
+    QUrl url(m_projectUrl + "/rest/v1/rpc/" + functionName);
+    QNetworkRequest request = buildRequest(url, true);
+
+    QNetworkReply *reply = m_manager->post(request, QJsonDocument(params).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, requestId]() {
+        const QByteArray data = reply->readAll();
+        const bool ok = reply->error() == QNetworkReply::NoError;
+        QJsonValue result;
+        if (ok) {
+            // PostgREST returns a bare JSON scalar/array/object for RPC calls;
+            // wrap it in an array so QJsonDocument can parse scalar replies too.
+            const QJsonDocument wrapped = QJsonDocument::fromJson("[" + data + "]");
+            result = (wrapped.isArray() && !wrapped.array().isEmpty()) ? wrapped.array().first() : QJsonValue();
+        }
+        emit rpcFinished(requestId, ok, result, ok ? QString() : QString::fromUtf8(data));
+        reply->deleteLater();
+    });
+}
+

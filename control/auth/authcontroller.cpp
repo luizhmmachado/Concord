@@ -2,6 +2,7 @@
 
 #include <QSettings>
 #include <QCoreApplication>
+#include <QJsonDocument>
 
 AuthController::AuthController(SupabaseClient *client, QObject *parent)
     : QObject(parent)
@@ -19,6 +20,14 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
     connect(m_client, &SupabaseClient::signInFinished, this, [this](bool ok, const QJsonObject &data, const QString &error) {
         setBusy(false);
         if (!ok) {
+            // GoTrue reports an unconfirmed e-mail via error_code/msg fields;
+            // route the user to the confirmation screen instead of a plain error.
+            const QJsonObject errorBody = QJsonDocument::fromJson(error.toUtf8()).object();
+            const QString reason = errorBody.value("msg").toString() + errorBody.value("error_description").toString() + errorBody.value("error_code").toString();
+            if (reason.contains("confirm", Qt::CaseInsensitive)) {
+                emit emailNotConfirmed();
+                return;
+            }
             setLastError(error);
             return;
         }
@@ -34,6 +43,8 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
         emit authenticatedChanged();
         emit signInSucceeded();
         fetchProfile();
+        m_pendingPassword.fill(QChar(0));
+        m_pendingPassword.clear();
     });
 
     connect(m_client, &SupabaseClient::sessionRefreshed, this, [this](bool ok, const QJsonObject &data, const QString &error) {
@@ -58,6 +69,8 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
         m_client->clearSession();
         m_username.clear();
         m_displayName.clear();
+        m_pendingPassword.fill(QChar(0));
+        m_pendingPassword.clear();
 
         QSettings settings;
         settings.remove("auth/refreshToken");
@@ -74,6 +87,27 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
         m_username = profile.value("username").toString();
         m_displayName = profile.value("display_name").toString();
         emit profileChanged();
+    });
+
+    connect(m_client, &SupabaseClient::rpcFinished, this, [this](const QString &tag, bool ok, const QJsonValue &result, const QString &error) {
+        if (tag != "auth:resolveUsername")
+            return;
+        if (!ok || !result.isString() || result.toString().isEmpty()) {
+            setBusy(false);
+            setLastError("Usuário ou senha inválidos");
+            return;
+        }
+        m_pendingConfirmationEmail = result.toString();
+        emit pendingConfirmationEmailChanged();
+        m_client->signIn(m_pendingConfirmationEmail, m_pendingPassword);
+    });
+
+    connect(m_client, &SupabaseClient::resendConfirmationFinished, this, [this](bool ok, const QString &error) {
+        if (!ok) {
+            setLastError(error);
+            return;
+        }
+        emit confirmationEmailResent();
     });
 }
 
@@ -95,14 +129,31 @@ void AuthController::signUp(const QString &email, const QString &password, const
 {
     setBusy(true);
     setLastError(QString());
+    m_pendingConfirmationEmail = email;
+    emit pendingConfirmationEmailChanged();
     m_client->signUp(email, password, QJsonObject{{"username", username}, {"display_name", displayName}});
 }
 
-void AuthController::signIn(const QString &email, const QString &password)
+void AuthController::signIn(const QString &identifier, const QString &password)
 {
     setBusy(true);
     setLastError(QString());
-    m_client->signIn(email, password);
+    m_pendingPassword = password;
+
+    if (identifier.contains('@')) {
+        m_pendingConfirmationEmail = identifier;
+        emit pendingConfirmationEmailChanged();
+        m_client->signIn(identifier, password);
+    } else {
+        m_client->rpc("get_email_for_username", QJsonObject{{"p_username", identifier}}, "auth:resolveUsername");
+    }
+}
+
+void AuthController::resendConfirmationEmail()
+{
+    if (m_pendingConfirmationEmail.isEmpty())
+        return;
+    m_client->resendConfirmationEmail(m_pendingConfirmationEmail);
 }
 
 void AuthController::signOut()

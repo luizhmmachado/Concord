@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonValue>
 #include <QUrlQuery>
 
 // Thin wrapper around Supabase's REST (PostgREST) and GoTrue (auth) HTTP APIs.
@@ -34,6 +35,7 @@ public:
     void signIn(const QString &email, const QString &password);
     void signOut();
     void refreshSession();
+    void resendConfirmationEmail(const QString &email);
 
     // Generic PostgREST helpers ("table" e.g. "servers?select=*").
     // "tag" is echoed back in the corresponding *Finished signal so callers
@@ -45,16 +47,21 @@ public:
     void update(const QString &tableAndQuery, const QJsonObject &patch, const QString &tag = QString());
     void remove(const QString &tableAndQuery, const QString &tag = QString());
 
+    // Calls a PostgREST RPC endpoint (Postgres function exposed via `/rest/v1/rpc/<name>`).
+    void rpc(const QString &functionName, const QJsonObject &params, const QString &tag = QString());
+
 signals:
     void signUpFinished(bool success, const QJsonObject &data, const QString &error);
     void signInFinished(bool success, const QJsonObject &data, const QString &error);
     void signOutFinished(bool success, const QString &error);
     void sessionRefreshed(bool success, const QJsonObject &data, const QString &error);
+    void resendConfirmationFinished(bool success, const QString &error);
 
     void selectFinished(const QString &requestId, bool success, const QJsonArray &rows, const QString &error);
     void insertFinished(const QString &requestId, bool success, const QJsonArray &rows, const QString &error);
     void updateFinished(const QString &requestId, bool success, const QJsonArray &rows, const QString &error);
     void deleteFinished(const QString &requestId, bool success, const QString &error);
+    void rpcFinished(const QString &requestId, bool success, const QJsonValue &result, const QString &error);
 
 private:
     QNetworkRequest buildRequest(const QUrl &url, bool withAuth = true) const;

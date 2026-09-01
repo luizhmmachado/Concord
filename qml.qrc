@@ -5,6 +5,7 @@
         <file>style/qmldir</file>
         <file>ui/LoginPage.qml</file>
         <file>ui/RegisterPage.qml</file>
+        <file>ui/EmailConfirmationPage.qml</file>
         <file>ui/MainWindow.qml</file>
         <file>ui/ServerSidebar.qml</file>
         <file>ui/ChannelSidebar.qml</file>

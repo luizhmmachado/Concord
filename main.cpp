@@ -17,8 +17,8 @@
 // they are safe to ship only because the anon key is meant to be public
 // and all data access is protected by Postgres Row Level Security (see
 // supabase/migrations/0002_row_level_security.sql).
-static const QString kSupabaseUrl = QStringLiteral("https://YOUR_PROJECT.supabase.co");
-static const QString kSupabaseAnonKey = QStringLiteral("YOUR_SUPABASE_ANON_KEY");
+static const QString kSupabaseUrl = QStringLiteral("https://vwhkcthqvofyadjforcf.supabase.co");
+static const QString kSupabaseAnonKey = QStringLiteral("sb_publishable_Qg9GqLbfC4kttyphWz-3Zg_e5euslN3");
 
 int main(int argc, char *argv[])
 {

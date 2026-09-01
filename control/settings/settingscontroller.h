@@ -55,7 +55,7 @@ private:
 
     SupabaseClient *m_client;
     QString m_theme = "dark";
-    QString m_accentColor = "#5865F2";
+    QString m_accentColor = "#1FD1C1";
     bool m_notificationsEnabled = true;
     QString m_inputDevice;
     QString m_outputDevice;
