@@ -92,15 +92,27 @@ Rectangle {
 
             AppButton {
                 width: parent.width
-                text: "Já confirmei, entrar"
-                onClicked: goToLogin()
+                text: authController.busy ? "Verificando..." : "Já confirmei, entrar"
+                enabled: !authController.busy
+                onClicked: {
+                    justResent = false
+                    authController.confirmSignIn()
+                }
             }
 
             AppButton {
                 width: parent.width
                 baseColor: Theme.surfaceAlt
                 text: "Reenviar e-mail"
+                enabled: !authController.busy
                 onClicked: authController.resendConfirmationEmail()
+            }
+
+            AppButton {
+                width: parent.width
+                baseColor: "transparent"
+                text: "Voltar ao login"
+                onClicked: goToLogin()
             }
         }
     }

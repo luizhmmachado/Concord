@@ -31,6 +31,9 @@ public:
     // Accepts either an e-mail address or a username as `identifier`.
     Q_INVOKABLE void signIn(const QString &identifier, const QString &password);
     Q_INVOKABLE void signOut();
+    // Retries the sign in with the credentials kept from the sign up/sign in
+    // attempt, so the user lands straight in the app after confirming.
+    Q_INVOKABLE void confirmSignIn();
     Q_INVOKABLE void tryRestoreSession();
     Q_INVOKABLE void resendConfirmationEmail();
 

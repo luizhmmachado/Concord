@@ -28,6 +28,7 @@ public:
     void setServers(const QJsonArray &rows);
     void upsertServer(const QJsonObject &row);
     QString serverIdAt(int row) const;
+    const ServerEntry *serverById(const QString &serverId) const;
 
 private:
     QVector<ServerEntry> m_servers;

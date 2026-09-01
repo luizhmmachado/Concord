@@ -34,6 +34,8 @@ QVariant CallParticipantModel::data(const QModelIndex &index, int role) const
     case CameraOnRole: return entry.cameraOn;
     case ScreenSharingRole: return entry.screenSharing;
     case ConnectionStateRole: return entry.connectionState;
+    case VideoSourceRole: return QVariant::fromValue(entry.videoSource);
+    case ScreenSourceRole: return QVariant::fromValue(entry.screenSource);
     default: return {};
     }
 }
@@ -47,6 +49,8 @@ QHash<int, QByteArray> CallParticipantModel::roleNames() const
         {CameraOnRole, "cameraOn"},
         {ScreenSharingRole, "screenSharing"},
         {ConnectionStateRole, "connectionState"},
+        {VideoSourceRole, "videoSource"},
+        {ScreenSourceRole, "screenSource"},
     };
 }
 
@@ -60,6 +64,16 @@ void CallParticipantModel::addParticipant(const QString &userId, const QString &
     entry.displayName = displayName;
     m_participants.append(entry);
     endInsertRows();
+    emit countChanged();
+}
+
+void CallParticipantModel::setDisplayName(const QString &userId, const QString &displayName)
+{
+    const int row = indexOf(userId);
+    if (row < 0 || displayName.isEmpty() || m_participants.at(row).displayName == displayName)
+        return;
+    m_participants[row].displayName = displayName;
+    emit dataChanged(index(row), index(row), {DisplayNameRole});
 }
 
 void CallParticipantModel::removeParticipant(const QString &userId)
@@ -70,6 +84,7 @@ void CallParticipantModel::removeParticipant(const QString &userId)
     beginRemoveRows(QModelIndex(), row, row);
     m_participants.removeAt(row);
     endRemoveRows();
+    emit countChanged();
 }
 
 void CallParticipantModel::setConnectionState(const QString &userId, const QString &state)
@@ -108,9 +123,34 @@ void CallParticipantModel::setScreenSharing(const QString &userId, bool sharing)
     emit dataChanged(index(row), index(row), {ScreenSharingRole});
 }
 
+void CallParticipantModel::setVideoSource(const QString &userId, QObject *source)
+{
+    const int row = indexOf(userId);
+    if (row < 0)
+        return;
+    m_participants[row].videoSource = source;
+    emit dataChanged(index(row), index(row), {VideoSourceRole});
+}
+
+void CallParticipantModel::setScreenSource(const QString &userId, QObject *source)
+{
+    const int row = indexOf(userId);
+    if (row < 0)
+        return;
+    m_participants[row].screenSource = source;
+    emit dataChanged(index(row), index(row), {ScreenSourceRole});
+}
+
+bool CallParticipantModel::isScreenSharing(const QString &userId) const
+{
+    const int row = indexOf(userId);
+    return row >= 0 && m_participants.at(row).screenSharing;
+}
+
 void CallParticipantModel::clear()
 {
     beginResetModel();
     m_participants.clear();
     endResetModel();
+    emit countChanged();
 }

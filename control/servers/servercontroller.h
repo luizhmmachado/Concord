@@ -15,6 +15,8 @@ class ServerController : public QObject
     Q_PROPERTY(ServerListModel *servers READ servers CONSTANT)
     Q_PROPERTY(ChannelListModel *channels READ channels CONSTANT)
     Q_PROPERTY(QString currentServerId READ currentServerId NOTIFY currentServerChanged)
+    Q_PROPERTY(QString currentServerName READ currentServerName NOTIFY currentServerChanged)
+    Q_PROPERTY(QString currentServerInviteCode READ currentServerInviteCode NOTIFY currentServerChanged)
 
 public:
     ServerController(SupabaseClient *client, RealtimeClient *realtime, QObject *parent = nullptr);
@@ -22,6 +24,8 @@ public:
     ServerListModel *servers() { return &m_servers; }
     ChannelListModel *channels() { return &m_channels; }
     QString currentServerId() const { return m_currentServerId; }
+    QString currentServerName() const;
+    QString currentServerInviteCode() const;
 
     Q_INVOKABLE void loadServers(const QString &userId);
     Q_INVOKABLE void selectServer(const QString &serverId);
@@ -32,6 +36,7 @@ public:
 signals:
     void currentServerChanged();
     void serverCreated(const QString &serverId);
+    void serverJoined(const QString &serverId);
     void errorOccurred(const QString &message);
 
 private:

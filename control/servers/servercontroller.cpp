@@ -20,6 +20,9 @@ ServerController::ServerController(SupabaseClient *client, RealtimeClient *realt
                     flattened.append(server);
             }
             m_servers.setServers(flattened);
+            // The invite code / name of the selected server only become known
+            // once the list arrives.
+            emit currentServerChanged();
         } else if (tag == "channels:list") {
             if (!ok) {
                 emit errorOccurred(error);
@@ -34,6 +37,18 @@ ServerController::ServerController(SupabaseClient *client, RealtimeClient *realt
             const QString serverId = rows.first().toObject().value("id").toString();
             m_client->insert("server_members", QJsonObject{{"server_id", serverId}, {"user_id", m_userId}, {"role", "member"}}, "members:join");
         }
+    });
+
+    connect(m_client, &SupabaseClient::rpcFinished, this, [this](const QString &tag, bool ok, const QJsonValue &result, const QString &error) {
+        if (tag != "servers:joinInvite")
+            return;
+        if (!ok || !result.isString()) {
+            const QString reason = QJsonDocument::fromJson(error.toUtf8()).object().value("message").toString();
+            emit errorOccurred(reason.isEmpty() ? QStringLiteral("Convite inv\u00e1lido") : reason);
+            return;
+        }
+        emit serverJoined(result.toString());
+        loadServers(m_userId);
     });
 
     connect(m_client, &SupabaseClient::insertFinished, this, [this](const QString &tag, bool ok, const QJsonArray &rows, const QString &error) {
@@ -83,10 +98,26 @@ void ServerController::createServer(const QString &name)
 
 void ServerController::joinServerByInviteCode(const QString &inviteCode)
 {
-    // Resolve the invite code to a server id, then insert the membership row
-    // (handled in the constructor's selectFinished handler via the
-    // "servers:resolveInvite" tag).
-    m_client->select(QStringLiteral("servers?invite_code=eq.%1&select=id").arg(inviteCode), "servers:resolveInvite");
+    // RLS only exposes servers to their members, so a non-member cannot resolve
+    // the invite code directly; a SECURITY DEFINER function does it instead.
+    QString code = inviteCode.trimmed();
+    const int separator = code.lastIndexOf('/');
+    if (separator >= 0)
+        code = code.mid(separator + 1);
+
+    m_client->rpc("join_server_by_invite", QJsonObject{{"p_invite_code", code}}, "servers:joinInvite");
+}
+
+QString ServerController::currentServerName() const
+{
+    const ServerEntry *entry = m_servers.serverById(m_currentServerId);
+    return entry ? entry->name : QString();
+}
+
+QString ServerController::currentServerInviteCode() const
+{
+    const ServerEntry *entry = m_servers.serverById(m_currentServerId);
+    return entry ? entry->inviteCode : QString();
 }
 
 void ServerController::createChannel(const QString &serverId, const QString &name, const QString &type)

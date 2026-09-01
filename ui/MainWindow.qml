@@ -12,6 +12,7 @@ Rectangle {
     property string activeChannelId: ""
     property string activeChannelType: ""
     property bool showSettings: false
+    property bool showDirectMessages: false
     property string bannerMessage: ""
 
     Component.onCompleted: serverController.loadServers(authController.userId)
@@ -22,6 +23,10 @@ Rectangle {
     }
     Connections {
         target: chatController
+        function onErrorOccurred(message) { root.bannerMessage = message }
+    }
+    Connections {
+        target: directMessageController
         function onErrorOccurred(message) { root.bannerMessage = message }
     }
 
@@ -60,12 +65,17 @@ Rectangle {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
+        directMessagesActive: root.showDirectMessages
         onSettingsRequested: root.showSettings = true
         onCreateServerRequested: createServerDialog.open()
+        onDirectMessagesRequested: root.showDirectMessages = true
+        onServerSelected: root.showDirectMessages = false
     }
 
     ChannelSidebar {
         id: channelSidebar
+        visible: !root.showDirectMessages
+        width: visible ? 232 : 0
         anchors.left: serverSidebar.right
         anchors.top: parent.top
         anchors.bottom: parent.bottom
@@ -86,6 +96,8 @@ Rectangle {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         sourceComponent: {
+            if (root.showDirectMessages)
+                return directMessagesComponent
             if (root.activeChannelType === "voice" || callController.inCall)
                 return callViewComponent
             if (root.activeChannelId.length > 0)
@@ -96,6 +108,7 @@ Rectangle {
 
     Component { id: chatViewComponent; ChatView {} }
     Component { id: callViewComponent; CallView {} }
+    Component { id: directMessagesComponent; DirectMessagesView {} }
     Component {
         id: emptyStateComponent
         Rectangle {
@@ -120,21 +133,45 @@ Rectangle {
 
     Dialog {
         id: createServerDialog
-        title: "Novo servidor"
+        title: "Servidores"
         modal: true
         anchors.centerIn: parent
-        standardButtons: Dialog.Ok | Dialog.Cancel
+        standardButtons: Dialog.Close
 
         Column {
-            spacing: 8
-            AppTextField { id: serverNameField; placeholderText: "Nome do servidor"; width: 240 }
-        }
+            spacing: 14
 
-        onAccepted: {
-            if (serverNameField.text.length === 0)
-                return
-            serverController.createServer(serverNameField.text)
-            serverNameField.text = ""
+            Text { text: "Criar um servidor"; color: Theme.textPrimary; font.bold: true }
+            Row {
+                spacing: 8
+                AppTextField { id: serverNameField; placeholderText: "Nome do servidor"; width: 240 }
+                AppButton {
+                    text: "Criar"
+                    enabled: serverNameField.text.length > 0
+                    onClicked: {
+                        serverController.createServer(serverNameField.text)
+                        serverNameField.text = ""
+                        createServerDialog.close()
+                    }
+                }
+            }
+
+            Rectangle { width: 320; height: 1; color: Qt.rgba(1, 1, 1, 0.08) }
+
+            Text { text: "Entrar com um convite"; color: Theme.textPrimary; font.bold: true }
+            Row {
+                spacing: 8
+                AppTextField { id: inviteCodeField; placeholderText: "concord://invite/codigo"; width: 240 }
+                AppButton {
+                    text: "Entrar"
+                    enabled: inviteCodeField.text.length > 0
+                    onClicked: {
+                        serverController.joinServerByInviteCode(inviteCodeField.text)
+                        inviteCodeField.text = ""
+                        createServerDialog.close()
+                    }
+                }
+            }
         }
     }
 }

@@ -46,7 +46,9 @@ Window {
     Component {
         id: confirmationComponent
         EmailConfirmationPage {
-            onGoToLogin: stack.pop()
+            // Unwind to the login page: the confirmation screen may have been
+            // reached through the register page.
+            onGoToLogin: stack.pop(null)
         }
     }
 

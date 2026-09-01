@@ -1,62 +1,239 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtMultimedia 5.15
 import "qrc:/style"
 import "qrc:/ui/Components"
 
-// Video call surface: a grid of participant tiles + the control bar
-// (mute mic, toggle camera, toggle screen-share, hang up).
-//
-// NOTE: remote video/screen frames from GStreamer are not yet bridged into
-// a QML-paintable surface (would need a QQuickFramebufferObject/appsink
-// bridge); today this view only reflects call state (who is connected,
-// muted, camera/screen status), not actual pixels. See README.
 Rectangle {
+    id: root
     color: Theme.surfaceAlt
     anchors.fill: parent
 
+    // Transmissões remotas ficam esmaecidas até o usuário optar por assistir.
+    property var watching: ({})
+
+    function isWatching(userId) {
+        return watching[userId] === true
+    }
+
+    function toggleWatching(userId) {
+        var next = watching
+        next[userId] = !next[userId]
+        watching = next
+    }
+
+    Item {
+        id: shareStage
+        visible: callController.anyoneScreenSharing
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: visible ? 12 : 0
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
+        height: visible ? root.height * 0.42 : 0
+
+        ListView {
+            id: shareList
+            anchors.fill: parent
+            orientation: ListView.Horizontal
+            spacing: 10
+            clip: true
+            model: callController.participants
+            ScrollBar.horizontal: ScrollBar {}
+
+            delegate: Item {
+                id: shareTile
+                required property string userId
+                required property string displayName
+                required property bool screenSharing
+                required property var screenSource
+
+                readonly property bool isLocal: shareTile.userId === authController.userId
+                // O próprio preview nunca é ocultado.
+                readonly property bool revealed: isLocal || root.isWatching(shareTile.userId)
+                readonly property real aspect: {
+                    var size = shareTile.screenSource ? shareTile.screenSource.frameSize : null
+                    return (size && size.height > 0) ? size.width / size.height : 16 / 9
+                }
+
+                visible: shareTile.screenSharing
+                width: visible ? Math.min(shareList.width, shareList.height * aspect) : 0
+                height: shareList.height
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radiusMedium
+                    color: Theme.surface
+                    border.width: 1
+                    border.color: shareTile.revealed ? Qt.rgba(0.12, 0.82, 0.76, 0.55)
+                                                     : Qt.rgba(1, 1, 1, 0.12)
+                    clip: true
+
+                    VideoOutput {
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        source: shareTile.screenSource
+                        fillMode: VideoOutput.PreserveAspectFit
+                        opacity: shareTile.revealed ? 1.0 : 0.15
+                    }
+
+                    Column {
+                        anchors.centerIn: parent
+                        visible: !shareTile.revealed
+                        spacing: 10
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: shareTile.displayName + " está transmitindo"
+                            color: Theme.textPrimary
+                            font.pixelSize: 14
+                            font.bold: true
+                        }
+                        AppButton {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "Assistir"
+                            onClicked: root.toggleWatching(shareTile.userId)
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        anchors.left: parent.left
+                        anchors.margins: 8
+                        width: label.implicitWidth + 16
+                        height: 24
+                        radius: 12
+                        color: Qt.rgba(0, 0, 0, 0.55)
+
+                        Text {
+                            id: label
+                            anchors.centerIn: parent
+                            text: shareTile.isLocal ? "Sua transmissão" : shareTile.displayName
+                            color: "white"
+                            font.pixelSize: 11
+                            font.bold: true
+                        }
+                    }
+
+                    AppButton {
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.margins: 8
+                        visible: shareTile.revealed && !shareTile.isLocal
+                        text: "Parar de assistir"
+                        baseColor: Theme.surfaceAlt
+                        onClicked: root.toggleWatching(shareTile.userId)
+                    }
+                }
+            }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            visible: callController.screenSharing && !screenCaptureSupported
+            text: "Compartilhamento de tela indisponível neste ambiente (Wayland)."
+            color: Theme.textPrimary
+            font.pixelSize: 20
+            font.bold: true
+        }
+    }
+
     GridView {
         id: grid
-        anchors.top: parent.top
+        anchors.top: shareStage.visible ? shareStage.bottom : parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: controlBar.top
         anchors.margins: 12
-        cellWidth: width / Math.max(1, Math.ceil(Math.sqrt(count)))
-        cellHeight: cellWidth * 0.75
+
+        readonly property int tileCount: Math.max(1, count)
+        readonly property int columns: Math.max(1, Math.ceil(Math.sqrt(tileCount)))
+        readonly property int rows: Math.max(1, Math.ceil(tileCount / columns))
+
+        cellWidth: Math.floor(width / columns)
+        cellHeight: Math.floor(height / rows)
         model: callController.participants
+        interactive: false
+        clip: true
 
-        delegate: Rectangle {
-            width: grid.cellWidth - 8
-            height: grid.cellHeight - 8
-            radius: Theme.radiusMedium
-            color: Theme.surface
+        delegate: Item {
+            id: participantCell
+            required property string userId
+            required property string displayName
+            required property bool muted
+            required property bool cameraOn
+            required property bool screenSharing
+            required property string connectionState
+            required property var videoSource
 
-            Avatar { anchors.centerIn: parent; displayName: displayName; width: 64; height: 64 }
+            readonly property bool isLocal: participantCell.userId === authController.userId
+            readonly property bool showCamera: participantCell.videoSource !== null
+                                               && (isLocal ? callController.cameraEnabled : participantCell.cameraOn)
 
-            Row {
-                anchors.bottom: parent.bottom
-                anchors.left: parent.left
+            width: grid.cellWidth
+            height: grid.cellHeight
+
+            Rectangle {
+                anchors.fill: parent
                 anchors.margins: 6
-                spacing: 4
-                Text { text: displayName; color: Theme.textPrimary; font.bold: true }
-                Text { visible: muted; text: "🔇"; color: Theme.danger }
-                Text { visible: screenSharing; text: "🖥"; color: Theme.online }
-            }
+                radius: Theme.radiusMedium
+                color: Theme.surface
+                clip: true
 
-            Text {
-                anchors.top: parent.top
-                anchors.right: parent.right
-                anchors.margins: 6
-                text: connectionState
-                color: Theme.textSecondary
-                font.pixelSize: 10
+                Avatar {
+                    anchors.centerIn: parent
+                    visible: !participantCell.showCamera
+                    displayName: participantCell.displayName
+                    width: Math.min(parent.width, parent.height) * 0.4
+                    height: width
+                }
+
+                VideoOutput {
+                    anchors.fill: parent
+                    visible: participantCell.showCamera
+                    source: participantCell.videoSource
+                    fillMode: VideoOutput.PreserveAspectCrop
+                }
+
+                Text {
+                    anchors.bottom: parent.bottom
+                    anchors.left: parent.left
+                    anchors.right: statusRow.left
+                    anchors.margins: 8
+                    text: participantCell.displayName
+                    color: Theme.textPrimary
+                    font.bold: true
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
+                }
+
+                Row {
+                    id: statusRow
+                    anchors.bottom: parent.bottom
+                    anchors.right: parent.right
+                    anchors.margins: 8
+                    spacing: 4
+                    Text { visible: participantCell.muted; text: "🔇"; font.pixelSize: 11 }
+                    Text { visible: participantCell.screenSharing; text: "🖥"; color: Theme.accent; font.pixelSize: 11 }
+                }
+
+                Text {
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.margins: 8
+                    text: participantCell.connectionState
+                    color: Theme.textSecondary
+                    font.pixelSize: 9
+                }
             }
         }
     }
 
     Row {
         id: controlBar
+        visible: callController.inCall
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottomMargin: 16
@@ -75,12 +252,127 @@ Rectangle {
         AppButton {
             text: callController.screenSharing ? "🖥 Parar transmissão" : "🖥 Transmitir tela"
             baseColor: callController.screenSharing ? Theme.accent : Theme.surface
-            onClicked: callController.toggleScreenShare()
+            onClicked: {
+                if (callController.screenSharing) {
+                    callController.stopScreenShare()
+                } else {
+                    callController.screenShareSources.refresh()
+                    sourcePicker.open()
+                }
+            }
         }
         AppButton {
             text: "📞 Sair"
             baseColor: Theme.danger
             onClicked: callController.leaveCall()
+        }
+    }
+
+    Popup {
+        id: sourcePicker
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: 520
+        height: 460
+        modal: true
+        focus: true
+        padding: 0
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        background: Rectangle {
+            color: Theme.surface
+            radius: Theme.radiusMedium
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.12)
+        }
+
+        property int selectedIndex: -1
+
+        onOpened: selectedIndex = -1
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 20
+            spacing: 14
+
+            Text {
+                text: "O que você quer transmitir?"
+                color: Theme.textPrimary
+                font.pixelSize: 18
+                font.bold: true
+            }
+
+            ListView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: callController.screenShareSources
+                spacing: 4
+                ScrollBar.vertical: ScrollBar {}
+
+                delegate: Rectangle {
+                    width: ListView.view.width
+                    height: 46
+                    radius: Theme.radiusSmall
+                    color: sourcePicker.selectedIndex === index
+                           ? Theme.accent
+                           : (hover.hovered ? Qt.rgba(1, 1, 1, 0.07) : "transparent")
+
+                    HoverHandler { id: hover }
+
+                    Row {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 10
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: isWindow ? "🪟" : "🖥"
+                            font.pixelSize: 18
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - 40
+                            text: title
+                            color: Theme.textPrimary
+                            font.pixelSize: 13
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    TapHandler {
+                        onTapped: sourcePicker.selectedIndex = index
+                        onDoubleTapped: {
+                            callController.startScreenShare(index)
+                            sourcePicker.close()
+                        }
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                Item { Layout.fillWidth: true }
+
+                AppButton {
+                    text: "Cancelar"
+                    baseColor: Theme.surfaceAlt
+                    onClicked: sourcePicker.close()
+                }
+                AppButton {
+                    text: "Transmitir"
+                    baseColor: Theme.accent
+                    enabled: sourcePicker.selectedIndex >= 0
+                    opacity: enabled ? 1 : 0.5
+                    onClicked: {
+                        callController.startScreenShare(sourcePicker.selectedIndex)
+                        sourcePicker.close()
+                    }
+                }
+            }
         }
     }
 }

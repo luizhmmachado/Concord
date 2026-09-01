@@ -4,6 +4,7 @@
 #include <QAbstractListModel>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QHash>
 
 struct MessageEntry {
     QString id;
@@ -11,13 +12,27 @@ struct MessageEntry {
     QString authorName;
     QString content;
     QString createdAt;
+    QString timeLabel;
+    // Non-empty only on the first message of a day, e.g. "24 de junho de 2026".
+    QString daySeparator;
+    // True when it continues the previous author's block (no avatar/header).
+    bool grouped = false;
 };
 
 class MessageListModel : public QAbstractListModel
 {
     Q_OBJECT
 public:
-    enum Roles { IdRole = Qt::UserRole + 1, AuthorIdRole, AuthorNameRole, ContentRole, CreatedAtRole };
+    enum Roles {
+        IdRole = Qt::UserRole + 1,
+        AuthorIdRole,
+        AuthorNameRole,
+        ContentRole,
+        CreatedAtRole,
+        TimeLabelRole,
+        DaySeparatorRole,
+        GroupedRole,
+    };
 
     explicit MessageListModel(QObject *parent = nullptr);
 
@@ -29,9 +44,16 @@ public:
     void appendMessage(const QJsonObject &row);
     void clear();
 
-private:
-    static MessageEntry fromJson(const QJsonObject &obj);
+    // Used when a realtime payload arrives without the joined profile row.
+    void setAuthorNameFallback(const QString &authorId, const QString &name);
 
+private:
+    MessageEntry fromJson(const QJsonObject &obj) const;
+    void applyDaySeparator(MessageEntry &entry, const MessageEntry *previous) const;
+    void applyGrouping(MessageEntry &entry, const MessageEntry *previous) const;
+    int indexOfId(const QString &id) const;
+
+    QHash<QString, QString> m_authorNameFallback;
     QVector<MessageEntry> m_messages;
 };
 

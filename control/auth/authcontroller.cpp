@@ -4,6 +4,43 @@
 #include <QCoreApplication>
 #include <QJsonDocument>
 
+namespace {
+
+// GoTrue answers with a raw JSON body; never show that to the user.
+QString friendlyAuthError(const QString &raw)
+{
+    if (raw.trimmed().isEmpty())
+        return QObject::tr("Não foi possível conectar. Verifique sua internet e tente de novo.");
+
+    const QJsonObject body = QJsonDocument::fromJson(raw.toUtf8()).object();
+    const QString code = body.value("error_code").toString(body.value("error").toString());
+    const QString message = body.value("msg").toString(
+        body.value("message").toString(body.value("error_description").toString()));
+    const QString haystack = (code + ' ' + message).toLower();
+
+    if (haystack.contains("invalid_credentials") || haystack.contains("invalid login"))
+        return QObject::tr("Usuário ou senha inválidos.");
+    if (haystack.contains("email_not_confirmed") || haystack.contains("not confirmed"))
+        return QObject::tr("E-mail ainda não confirmado. Abra o link que enviamos e tente de novo.");
+    if (haystack.contains("already_registered") || haystack.contains("already been registered")
+        || haystack.contains("user_already_exists"))
+        return QObject::tr("Este e-mail já está cadastrado.");
+    if (haystack.contains("weak_password") || haystack.contains("at least 6"))
+        return QObject::tr("Senha muito curta. Use pelo menos 6 caracteres.");
+    if (haystack.contains("validate email") || haystack.contains("invalid email"))
+        return QObject::tr("E-mail inválido.");
+    if (haystack.contains("rate limit") || haystack.contains("over_email_send"))
+        return QObject::tr("Muitas tentativas. Aguarde alguns minutos e tente de novo.");
+    if (haystack.contains("refresh_token") || haystack.contains("session"))
+        return QObject::tr("Sua sessão expirou. Entre novamente.");
+
+    if (!message.isEmpty())
+        return message;
+    return QObject::tr("Não foi possível concluir a operação. Tente de novo.");
+}
+
+} // namespace
+
 AuthController::AuthController(SupabaseClient *client, QObject *parent)
     : QObject(parent)
     , m_client(client)
@@ -11,7 +48,7 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
     connect(m_client, &SupabaseClient::signUpFinished, this, [this](bool ok, const QJsonObject &data, const QString &error) {
         setBusy(false);
         if (!ok) {
-            setLastError(error);
+            setLastError(friendlyAuthError(error));
             return;
         }
         emit signUpSucceeded();
@@ -25,10 +62,11 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
             const QJsonObject errorBody = QJsonDocument::fromJson(error.toUtf8()).object();
             const QString reason = errorBody.value("msg").toString() + errorBody.value("error_description").toString() + errorBody.value("error_code").toString();
             if (reason.contains("confirm", Qt::CaseInsensitive)) {
+                setLastError(QStringLiteral("E-mail ainda não confirmado. Abra o link que enviamos e tente de novo."));
                 emit emailNotConfirmed();
                 return;
             }
-            setLastError(error);
+            setLastError(friendlyAuthError(error));
             return;
         }
         const QString accessToken = data.value("access_token").toString();
@@ -48,8 +86,14 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
     });
 
     connect(m_client, &SupabaseClient::sessionRefreshed, this, [this](bool ok, const QJsonObject &data, const QString &error) {
+        setBusy(false);
         if (!ok) {
-            setLastError(error);
+            // A stale refresh token just means "show the login screen"; only
+            // surface the error when we already had a live session.
+            if (isAuthenticated())
+                setLastError(friendlyAuthError(error));
+            else
+                m_client->clearSession();
             return;
         }
         const QString accessToken = data.value("access_token").toString();
@@ -78,6 +122,7 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
 
         emit authenticatedChanged();
         emit profileChanged();
+        setBusy(false);
     });
 
     connect(m_client, &SupabaseClient::selectFinished, this, [this](const QString &requestId, bool ok, const QJsonArray &rows, const QString &) {
@@ -104,7 +149,7 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
 
     connect(m_client, &SupabaseClient::resendConfirmationFinished, this, [this](bool ok, const QString &error) {
         if (!ok) {
-            setLastError(error);
+            setLastError(friendlyAuthError(error));
             return;
         }
         emit confirmationEmailResent();
@@ -130,6 +175,7 @@ void AuthController::signUp(const QString &email, const QString &password, const
     setBusy(true);
     setLastError(QString());
     m_pendingConfirmationEmail = email;
+    m_pendingPassword = password;
     emit pendingConfirmationEmailChanged();
     m_client->signUp(email, password, QJsonObject{{"username", username}, {"display_name", displayName}});
 }
@@ -162,6 +208,18 @@ void AuthController::signOut()
     m_client->signOut();
 }
 
+void AuthController::confirmSignIn()
+{
+    if (m_pendingConfirmationEmail.isEmpty() || m_pendingPassword.isEmpty()) {
+        setLastError(QStringLiteral("Sessão expirada. Entre novamente com seu e-mail e senha."));
+        return;
+    }
+
+    setBusy(true);
+    setLastError(QString());
+    m_client->signIn(m_pendingConfirmationEmail, m_pendingPassword);
+}
+
 void AuthController::tryRestoreSession()
 {
     QSettings settings;
@@ -170,6 +228,7 @@ void AuthController::tryRestoreSession()
     if (refreshToken.isEmpty() || userId.isEmpty())
         return;
 
+    setBusy(true);
     m_client->setSession(QString(), refreshToken, userId);
     m_client->refreshSession();
 }

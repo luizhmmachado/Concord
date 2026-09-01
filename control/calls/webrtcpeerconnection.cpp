@@ -1,147 +1,183 @@
 #include "webrtcpeerconnection.h"
+#include "videostreamsource.h"
 
 #include <QMetaObject>
 #include <QDebug>
+#include <cstdio>
 
 WebRtcPeerConnection::WebRtcPeerConnection(const QString &peerId, QObject *parent)
     : QObject(parent)
     , m_peerId(peerId)
+    , m_remoteVideo(new VideoStreamSource(this))
+    , m_remoteScreen(new VideoStreamSource(this))
 {
+    m_remoteVideo->setObjectName(QStringLiteral("remote:%1").arg(peerId));
+    m_remoteScreen->setObjectName(QStringLiteral("remoteScreen:%1").arg(peerId));
 }
+
+#if CONCORD_HAS_GSTREAMER
 
 WebRtcPeerConnection::~WebRtcPeerConnection()
 {
-    teardownPipeline();
+    stop();
 }
 
-void WebRtcPeerConnection::start(bool polite)
+void WebRtcPeerConnection::start(bool polite, GstElement *webrtcbin)
 {
-    m_polite = polite;
-    buildPipeline();
-}
-
-void WebRtcPeerConnection::stop()
-{
-    teardownPipeline();
-}
-
-void WebRtcPeerConnection::buildPipeline()
-{
-    if (m_pipeline)
-        return;
-
-    GError *error = nullptr;
-
-#ifdef Q_OS_WIN
-    static const char *screenSrc = "d3d11screencapturesrc show-cursor=true";
-#elif defined(Q_OS_MAC)
-    static const char *screenSrc = "avfvideosrc capture-screen=true";
-#else
-    static const char *screenSrc = "ximagesrc use-damage=false";
-#endif
-
-    const QString description = QStringLiteral(
-        "webrtcbin name=sendrecv bundle-policy=max-bundle stun-server=stun://stun.l.google.com:19302 "
-        "autoaudiosrc ! queue ! audioconvert ! audioresample ! volume name=micvolume ! opusenc ! rtpopuspay pt=111 ! "
-        "queue ! sendrecv. "
-        "autovideosrc ! videoconvert ! valve name=cameravalve drop=true ! videoscale ! "
-        "video/x-raw,width=640,height=480 ! vp8enc deadline=1 target-bitrate=1000000 ! rtpvp8pay pt=96 ! "
-        "queue ! sendrecv. "
-        "%1 ! videoconvert ! valve name=screenvalve drop=true ! videoscale ! "
-        "vp8enc deadline=1 target-bitrate=2500000 ! rtpvp8pay pt=97 ! queue ! sendrecv."
-    ).arg(screenSrc);
-
-    m_pipeline = gst_parse_launch(description.toUtf8().constData(), &error);
-    if (!m_pipeline || error) {
-        emit errorOccurred(m_peerId, error ? QString::fromUtf8(error->message) : "Failed to build pipeline");
-        if (error)
-            g_error_free(error);
+    if (!webrtcbin) {
+        emit errorOccurred(m_peerId, QStringLiteral("webrtcbin não disponível"));
         return;
     }
 
-    m_webrtcbin = gst_bin_get_by_name(GST_BIN(m_pipeline), "sendrecv");
-    m_micVolume = gst_bin_get_by_name(GST_BIN(m_pipeline), "micvolume");
-    m_cameraValve = gst_bin_get_by_name(GST_BIN(m_pipeline), "cameravalve");
-    m_screenValve = gst_bin_get_by_name(GST_BIN(m_pipeline), "screenvalve");
+    m_polite = polite;
+    // Hold a reference: CallMediaEngine may drop the element from the pipeline
+    // before this object is destroyed.
+    m_webrtcbin = GST_ELEMENT(gst_object_ref(webrtcbin));
 
     g_signal_connect(m_webrtcbin, "on-negotiation-needed", G_CALLBACK(onNegotiationNeeded), this);
     g_signal_connect(m_webrtcbin, "on-ice-candidate", G_CALLBACK(onIceCandidate), this);
     g_signal_connect(m_webrtcbin, "notify::ice-connection-state", G_CALLBACK(onIceConnectionStateNotify), this);
-
-    m_bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
-    gst_bus_set_sync_handler(m_bus, onBusMessage, this, nullptr);
-
-    gst_element_set_state(m_pipeline, GST_STATE_PLAYING);
+    g_signal_connect(m_webrtcbin, "pad-added", G_CALLBACK(onIncomingStream), this);
 }
 
-void WebRtcPeerConnection::teardownPipeline()
+void WebRtcPeerConnection::stop()
 {
-    if (m_pipeline) {
-        gst_element_set_state(m_pipeline, GST_STATE_NULL);
+    if (m_webrtcbin) {
+        g_signal_handlers_disconnect_by_data(m_webrtcbin, this);
+        gst_object_unref(m_webrtcbin);
+        m_webrtcbin = nullptr;
     }
-    // gst_object_unref is safe on nullptr-checked pointers only; guard each.
-    if (m_micVolume) { gst_object_unref(m_micVolume); m_micVolume = nullptr; }
-    if (m_cameraValve) { gst_object_unref(m_cameraValve); m_cameraValve = nullptr; }
-    if (m_screenValve) { gst_object_unref(m_screenValve); m_screenValve = nullptr; }
-    if (m_webrtcbin) { gst_object_unref(m_webrtcbin); m_webrtcbin = nullptr; }
-    if (m_bus) {
-        gst_bus_set_sync_handler(m_bus, nullptr, nullptr, nullptr);
-        gst_object_unref(m_bus);
-        m_bus = nullptr;
+    if (m_remoteVideo)
+        m_remoteVideo->clear();
+    if (m_remoteScreen)
+        m_remoteScreen->clear();
+}
+
+void WebRtcPeerConnection::onIncomingStream(GstElement *webrtcbin, GstPad *pad, gpointer userData)
+{
+    if (GST_PAD_DIRECTION(pad) != GST_PAD_SRC)
+        return;
+
+    auto *self = static_cast<WebRtcPeerConnection *>(userData);
+
+    GstElement *pipeline = GST_ELEMENT(gst_element_get_parent(webrtcbin));
+    if (!pipeline)
+        return;
+
+    GstElement *decode = gst_element_factory_make("decodebin", nullptr);
+    if (!decode) {
+        gst_object_unref(pipeline);
+        return;
     }
-    if (m_pipeline) { gst_object_unref(m_pipeline); m_pipeline = nullptr; }
+
+    g_signal_connect(decode, "pad-added", G_CALLBACK(onDecodedPad), self);
+    // The m-line order matches how CallMediaEngine adds the branches:
+    // 0 = microphone, 1 = camera, 2 = screen.
+    int mline = 0;
+    if (const gchar *name = GST_PAD_NAME(pad))
+        sscanf(name, "src_%d", &mline);
+    g_object_set_data(G_OBJECT(decode), "concord-mline", GINT_TO_POINTER(mline));
+    qInfo() << "[rtc]" << self->m_peerId << "stream recebido pad=" << GST_PAD_NAME(pad) << "mline=" << mline;
+
+    gst_bin_add(GST_BIN(pipeline), decode);
+    gst_element_sync_state_with_parent(decode);
+
+    GstPad *sink = gst_element_get_static_pad(decode, "sink");
+    gst_pad_link(pad, sink);
+    gst_object_unref(sink);
+    gst_object_unref(pipeline);
 }
 
-void WebRtcPeerConnection::setMicMuted(bool muted)
+void WebRtcPeerConnection::onDecodedPad(GstElement *decodebin, GstPad *pad, gpointer userData)
 {
-    if (m_micVolume)
-        g_object_set(m_micVolume, "mute", muted ? TRUE : FALSE, nullptr);
-}
+    auto *self = static_cast<WebRtcPeerConnection *>(userData);
 
-void WebRtcPeerConnection::setCameraEnabled(bool enabled)
-{
-    if (m_cameraValve)
-        g_object_set(m_cameraValve, "drop", enabled ? FALSE : TRUE, nullptr);
-}
+    GstCaps *caps = gst_pad_get_current_caps(pad);
+    if (!caps)
+        caps = gst_pad_query_caps(pad, nullptr);
+    if (!caps)
+        return;
 
-void WebRtcPeerConnection::setScreenSharing(bool enabled)
-{
-    if (m_screenValve)
-        g_object_set(m_screenValve, "drop", enabled ? FALSE : TRUE, nullptr);
+    const gchar *name = gst_structure_get_name(gst_caps_get_structure(caps, 0));
+    const bool isVideo = g_str_has_prefix(name, "video/");
+    const bool isAudio = g_str_has_prefix(name, "audio/");
+    gst_caps_unref(caps);
+
+    if (!isVideo && !isAudio)
+        return;
+
+    GstElement *pipeline = GST_ELEMENT(gst_element_get_parent(decodebin));
+    if (!pipeline)
+        return;
+
+    const char *description = isVideo
+        ? "queue max-size-buffers=2 leaky=downstream ! videoconvert ! video/x-raw,format=BGRA ! appsink name=remotesink"
+        : "queue max-size-buffers=10 leaky=downstream ! audioconvert ! audioresample ! autoaudiosink sync=false";
+
+    GError *error = nullptr;
+    GstElement *bin = gst_parse_bin_from_description(description, TRUE, &error);
+    if (!bin || error) {
+        if (error)
+            g_error_free(error);
+        gst_object_unref(pipeline);
+        return;
+    }
+
+    if (isVideo) {
+        const int mline = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(decodebin), "concord-mline"));
+        VideoStreamSource *target = mline >= 2 ? self->m_remoteScreen : self->m_remoteVideo;
+        qInfo() << "[rtc]" << self->m_peerId << "video decodificado mline=" << mline
+                << "->" << target->objectName();
+        if (GstElement *sink = gst_bin_get_by_name(GST_BIN(bin), "remotesink")) {
+            attachAppSinkToVideoSource(sink, target);
+            gst_object_unref(sink);
+        }
+    }
+
+    gst_bin_add(GST_BIN(pipeline), bin);
+    gst_element_sync_state_with_parent(bin);
+
+    GstPad *binSink = gst_element_get_static_pad(bin, "sink");
+    gst_pad_link(pad, binSink);
+    gst_object_unref(binSink);
+    gst_object_unref(pipeline);
 }
 
 void WebRtcPeerConnection::createOffer()
 {
+    if (!m_webrtcbin)
+        return;
     GstPromise *promise = gst_promise_new_with_change_func(onOfferCreated, this, nullptr);
     g_signal_emit_by_name(m_webrtcbin, "create-offer", nullptr, promise);
 }
 
 void WebRtcPeerConnection::createAnswer()
 {
+    if (!m_webrtcbin)
+        return;
     GstPromise *promise = gst_promise_new_with_change_func(onAnswerCreated, this, nullptr);
     g_signal_emit_by_name(m_webrtcbin, "create-answer", nullptr, promise);
 }
 
 void WebRtcPeerConnection::applyRemoteDescription(const QString &sdpType, const QString &sdp)
 {
+    qInfo() << "[rtc]" << m_peerId << "remote description" << sdpType << "bytes=" << sdp.size()
+            << "hasBin=" << (m_webrtcbin != nullptr);
     if (!m_webrtcbin)
         return;
 
+    const QByteArray sdpBytes = sdp.toUtf8();
     GstSDPMessage *sdpMessage = nullptr;
     gst_sdp_message_new(&sdpMessage);
-    gst_sdp_message_parse_buffer(reinterpret_cast<const guint8 *>(sdp.toUtf8().constData()), sdp.toUtf8().size(), sdpMessage);
+    gst_sdp_message_parse_buffer(reinterpret_cast<const guint8 *>(sdpBytes.constData()), sdpBytes.size(), sdpMessage);
 
     const GstWebRTCSDPType type = sdpType == "offer" ? GST_WEBRTC_SDP_TYPE_OFFER : GST_WEBRTC_SDP_TYPE_ANSWER;
     GstWebRTCSessionDescription *description = gst_webrtc_session_description_new(type, sdpMessage);
 
-    GstPromise *promise = gst_promise_new_with_change_func([](GstPromise *promise, gpointer userData) {
-        gst_promise_unref(promise);
-        auto *self = static_cast<WebRtcPeerConnection *>(userData);
-        if (self->m_polite == false && self->m_webrtcbin) {
-            // We received an offer -> we must answer.
-        }
-    }, this, nullptr);
+    GstPromise *promise = gst_promise_new();
     g_signal_emit_by_name(m_webrtcbin, "set-remote-description", description, promise);
+    gst_promise_interrupt(promise);
+    gst_promise_unref(promise);
 
     if (type == GST_WEBRTC_SDP_TYPE_OFFER)
         createAnswer();
@@ -159,6 +195,11 @@ void WebRtcPeerConnection::applyRemoteIceCandidate(const QString &candidate, int
 void WebRtcPeerConnection::onNegotiationNeeded(GstElement *, gpointer userData)
 {
     auto *self = static_cast<WebRtcPeerConnection *>(userData);
+    qInfo() << "[rtc]" << self->m_peerId << "negotiation-needed polite=" << self->m_polite;
+    // Only the impolite side offers; the polite side waits and answers,
+    // otherwise both peers would offer at once (glare).
+    if (self->m_polite)
+        return;
     QMetaObject::invokeMethod(self, [self]() { self->createOffer(); }, Qt::QueuedConnection);
 }
 
@@ -169,6 +210,9 @@ void WebRtcPeerConnection::onOfferCreated(GstPromise *promise, gpointer userData
     GstWebRTCSessionDescription *description = nullptr;
     gst_structure_get(reply, "offer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &description, nullptr);
     gst_promise_unref(promise);
+
+    if (!description)
+        return;
 
     GstPromise *setLocalPromise = gst_promise_new();
     g_signal_emit_by_name(self->m_webrtcbin, "set-local-description", description, setLocalPromise);
@@ -181,6 +225,7 @@ void WebRtcPeerConnection::onOfferCreated(GstPromise *promise, gpointer userData
     gst_webrtc_session_description_free(description);
 
     QMetaObject::invokeMethod(self, [self, sdp]() {
+        qInfo() << "[rtc]" << self->m_peerId << "offer criada";
         emit self->localDescriptionReady(self->m_peerId, "offer", sdp);
     }, Qt::QueuedConnection);
 }
@@ -193,6 +238,9 @@ void WebRtcPeerConnection::onAnswerCreated(GstPromise *promise, gpointer userDat
     gst_structure_get(reply, "answer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &description, nullptr);
     gst_promise_unref(promise);
 
+    if (!description)
+        return;
+
     GstPromise *setLocalPromise = gst_promise_new();
     g_signal_emit_by_name(self->m_webrtcbin, "set-local-description", description, setLocalPromise);
     gst_promise_interrupt(setLocalPromise);
@@ -204,6 +252,7 @@ void WebRtcPeerConnection::onAnswerCreated(GstPromise *promise, gpointer userDat
     gst_webrtc_session_description_free(description);
 
     QMetaObject::invokeMethod(self, [self, sdp]() {
+        qInfo() << "[rtc]" << self->m_peerId << "answer criada";
         emit self->localDescriptionReady(self->m_peerId, "answer", sdp);
     }, Qt::QueuedConnection);
 }
@@ -237,24 +286,35 @@ void WebRtcPeerConnection::onIceConnectionStateNotify(GstElement *webrtcbin, GPa
     }
 
     QMetaObject::invokeMethod(self, [self, stateName]() {
+        qInfo() << "[rtc]" << self->m_peerId << "ice-connection-state" << stateName;
         emit self->connectionStateChanged(self->m_peerId, stateName);
     }, Qt::QueuedConnection);
 }
 
-GstBusSyncReply WebRtcPeerConnection::onBusMessage(GstBus *, GstMessage *message, gpointer userData)
+#else // !CONCORD_HAS_GSTREAMER
+
+WebRtcPeerConnection::~WebRtcPeerConnection() = default;
+
+void WebRtcPeerConnection::start(bool polite, void *)
 {
-    auto *self = static_cast<WebRtcPeerConnection *>(userData);
-    if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ERROR) {
-        GError *error = nullptr;
-        gchar *debug = nullptr;
-        gst_message_parse_error(message, &error, &debug);
-        const QString errorText = QString::fromUtf8(error->message);
-        g_error_free(error);
-        g_free(debug);
-        QMetaObject::invokeMethod(self, [self, errorText]() {
-            emit self->errorOccurred(self->m_peerId, errorText);
-        }, Qt::QueuedConnection);
-    }
-    gst_message_unref(message);
-    return GST_BUS_DROP;
+    Q_UNUSED(polite)
+    emit connectionStateChanged(m_peerId, QStringLiteral("disabled"));
+    emit errorOccurred(m_peerId,
+                       QStringLiteral("Compilado sem GStreamer: áudio/vídeo indisponíveis."));
 }
+
+void WebRtcPeerConnection::stop() {}
+
+void WebRtcPeerConnection::applyRemoteDescription(const QString &sdpType, const QString &sdp)
+{
+    Q_UNUSED(sdpType)
+    Q_UNUSED(sdp)
+}
+
+void WebRtcPeerConnection::applyRemoteIceCandidate(const QString &candidate, int mLineIndex)
+{
+    Q_UNUSED(candidate)
+    Q_UNUSED(mLineIndex)
+}
+
+#endif // CONCORD_HAS_GSTREAMER

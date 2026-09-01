@@ -14,28 +14,69 @@ Rectangle {
         anchors.right: parent.right
         anchors.bottom: inputRow.top
         anchors.margins: 12
-        spacing: 10
+        spacing: 4
         model: chatController.messages
         clip: true
 
-        delegate: Row {
+        delegate: Column {
             width: messageList.width
-            spacing: 10
+            spacing: 4
 
-            Avatar { displayName: authorName }
+            Item { width: 1; height: grouped ? 0 : 8 }
 
-            Column {
-                width: parent.width - 50
-                Row {
-                    spacing: 6
-                    Text { text: authorName; color: Theme.textPrimary; font.bold: true }
-                    Text { text: createdAt; color: Theme.textSecondary; font.pixelSize: 11 }
+            Item {
+                width: parent.width
+                height: daySeparator.length > 0 ? 26 : 0
+                visible: daySeparator.length > 0
+
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left
+                    anchors.right: dayLabel.left
+                    anchors.rightMargin: 10
+                    height: 1
+                    color: Qt.rgba(1, 1, 1, 0.08)
                 }
                 Text {
-                    text: content
-                    color: Theme.textPrimary
-                    wrapMode: Text.WordWrap
-                    width: parent.width
+                    id: dayLabel
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: parent.right
+                    text: daySeparator
+                    color: Theme.textSecondary
+                    font.pixelSize: 11
+                }
+            }
+
+            Row {
+                width: parent.width
+                spacing: 10
+
+                Item {
+                    width: 40
+                    height: grouped ? 1 : 40
+                    Avatar {
+                        anchors.top: parent.top
+                        visible: !grouped
+                        displayName: authorName
+                    }
+                }
+
+                Column {
+                    width: parent.width - 50
+                    spacing: 2
+
+                    Row {
+                        visible: !grouped
+                        spacing: 6
+                        Text { text: authorName; color: Theme.textPrimary; font.bold: true }
+                        Text { text: timeLabel; color: Theme.textSecondary; font.pixelSize: 11 }
+                    }
+                    Text {
+                        text: content
+                        color: Theme.textPrimary
+                        wrapMode: Text.WordWrap
+                        width: parent.width
+                    }
                 }
             }
         }

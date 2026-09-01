@@ -11,7 +11,10 @@ Rectangle {
 
     signal serverSelected(string serverId)
     signal createServerRequested()
+    signal directMessagesRequested()
     signal settingsRequested()
+
+    property bool directMessagesActive: false
 
     Column {
         anchors.top: parent.top
@@ -41,6 +44,18 @@ Rectangle {
                         root.serverSelected(serverId)
                     }
                 }
+            }
+        }
+
+        Rectangle {
+            width: 48
+            height: 48
+            radius: 16
+            color: root.directMessagesActive ? Theme.accent : Theme.surface
+            Text { anchors.centerIn: parent; text: "\u2709"; color: "white"; font.pixelSize: 20 }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.directMessagesRequested()
             }
         }
 

@@ -84,3 +84,12 @@ QString ServerListModel::serverIdAt(int row) const
         return {};
     return m_servers.at(row).id;
 }
+
+const ServerEntry *ServerListModel::serverById(const QString &serverId) const
+{
+    for (const ServerEntry &entry : m_servers) {
+        if (entry.id == serverId)
+            return &entry;
+    }
+    return nullptr;
+}

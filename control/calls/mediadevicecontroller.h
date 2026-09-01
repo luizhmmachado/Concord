@@ -3,10 +3,12 @@
 
 #include <QObject>
 #include <QStringList>
-#include <gst/gst.h>
+#include <QAudioDeviceInfo>
+#include <QCameraInfo>
 
-// Enumerates available audio/video capture and playback devices using
-// GStreamer's device monitor, for display on the Settings page.
+// Enumerates available audio/video capture and playback devices using Qt's
+// native media APIs so the settings page works without requiring a custom
+// GStreamer runtime installation just to list devices.
 class MediaDeviceController : public QObject
 {
     Q_OBJECT
@@ -28,7 +30,6 @@ signals:
     void devicesChanged();
 
 private:
-    GstDeviceMonitor *m_monitor = nullptr;
     QStringList m_microphones;
     QStringList m_speakers;
     QStringList m_cameras;

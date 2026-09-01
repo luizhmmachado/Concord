@@ -11,6 +11,8 @@
         <file>ui/ChannelSidebar.qml</file>
         <file>ui/ChatView.qml</file>
         <file>ui/CallView.qml</file>
+        <file>ui/DirectMessagesView.qml</file>
+        <file>ui/ServerInvitePopup.qml</file>
         <file>ui/SettingsPage.qml</file>
         <file>ui/Components/qmldir</file>
         <file>ui/Components/AppButton.qml</file>
