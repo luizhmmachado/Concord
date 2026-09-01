@@ -3,6 +3,7 @@
 
 #include <QAbstractListModel>
 #include <QJsonArray>
+#include <QJsonObject>
 
 struct ServerEntry {
     QString id;

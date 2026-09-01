@@ -44,10 +44,8 @@ ServerController::ServerController(SupabaseClient *client, RealtimeClient *realt
             }
             const QJsonObject server = rows.first().toObject();
             m_servers.upsertServer(server);
-            // Owner automatically joins their own server as a member.
-            m_client->insert("server_members",
-                              QJsonObject{{"server_id", server.value("id")}, {"user_id", m_userId}, {"role", "owner"}},
-                              "members:createOwner");
+            // Owner membership is now created atomically by an "on_server_created"
+            // DB trigger (see migration 0005) - no follow-up insert needed here.
             emit serverCreated(server.value("id").toString());
         } else if (tag == "channels:create") {
             if (!ok || rows.isEmpty()) {

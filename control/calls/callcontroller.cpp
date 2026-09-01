@@ -30,12 +30,12 @@ CallController::CallController(SupabaseClient *client, RealtimeClient *realtime,
             addPeer(fromUserId, payload.value("displayName").toString(fromUserId), /*polite=*/true);
         } else if (event == "sdp") {
             if (auto it = m_peers.find(fromUserId); it != m_peers.end())
-                it->get()->applyRemoteDescription(payload.value("sdpType").toString(), payload.value("sdp").toString());
+                it->second->applyRemoteDescription(payload.value("sdpType").toString(), payload.value("sdp").toString());
         } else if (event == "ice") {
             if (auto it = m_peers.find(fromUserId); it != m_peers.end())
-                it->get()->applyRemoteIceCandidate(payload.value("candidate").toString(), payload.value("mLineIndex").toInt());
+                it->second->applyRemoteIceCandidate(payload.value("candidate").toString(), payload.value("mLineIndex").toInt());
         } else if (event == "leave") {
-            m_peers.remove(fromUserId);
+            m_peers.erase(fromUserId);
             m_participants.removeParticipant(fromUserId);
         }
     });
@@ -75,7 +75,7 @@ void CallController::startPrivateCall(const QString &conversationId, const QStri
 
 void CallController::addPeer(const QString &peerId, const QString &displayName, bool polite)
 {
-    if (m_peers.contains(peerId))
+    if (m_peers.find(peerId) != m_peers.end())
         return;
 
     // Lifetime is owned exclusively by m_peers (unique_ptr); do NOT also
@@ -103,7 +103,10 @@ void CallController::addPeer(const QString &peerId, const QString &displayName, 
     peer->setScreenSharing(m_screenSharing);
 
     m_participants.addParticipant(peerId, displayName);
-    m_peers.insert(peerId, std::move(peer));
+    // std::map::operator[] default-constructs (unique_ptr -> nullptr) then
+    // move-assigns here, unlike QMap which requires copy-assignment even
+    // through operator[] and can't hold move-only types.
+    m_peers[peerId] = std::move(peer);
 }
 
 void CallController::removeAllPeers()
@@ -131,7 +134,8 @@ void CallController::leaveCall()
 
 void CallController::applyLocalStateToAllPeers()
 {
-    for (auto &peer : m_peers) {
+    for (auto &entry : m_peers) {
+        WebRtcPeerConnection *peer = entry.second.get();
         peer->setMicMuted(m_micMuted);
         peer->setCameraEnabled(m_cameraEnabled);
         peer->setScreenSharing(m_screenSharing);

@@ -19,3 +19,5 @@ Makefile*
 .vscode/
 *.suo
 *.log
+.qtc_clangd/
+object_script.*

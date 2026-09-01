@@ -12,8 +12,48 @@ Rectangle {
     property string activeChannelId: ""
     property string activeChannelType: ""
     property bool showSettings: false
+    property string bannerMessage: ""
 
     Component.onCompleted: serverController.loadServers(authController.userId)
+
+    Connections {
+        target: serverController
+        function onErrorOccurred(message) { root.bannerMessage = message.length > 0 ? message : "Ocorreu um erro ao acessar o servidor (verifique as permiss\u00f5es/RLS no Supabase)." }
+    }
+    Connections {
+        target: chatController
+        function onErrorOccurred(message) { root.bannerMessage = message }
+    }
+
+    Rectangle {
+        visible: root.bannerMessage.length > 0
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: bannerText.implicitHeight + 16
+        color: Theme.danger
+        z: 20
+
+        Text {
+            id: bannerText
+            anchors.left: parent.left
+            anchors.right: closeBanner.left
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.margins: 8
+            text: root.bannerMessage
+            color: "white"
+            wrapMode: Text.WordWrap
+        }
+        Text {
+            id: closeBanner
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.margins: 8
+            text: "\u2715"
+            color: "white"
+            MouseArea { anchors.fill: parent; onClicked: root.bannerMessage = "" }
+        }
+    }
 
     ServerSidebar {
         id: serverSidebar

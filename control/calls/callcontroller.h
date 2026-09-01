@@ -2,7 +2,7 @@
 #define CALLCONTROLLER_H
 
 #include <QObject>
-#include <QMap>
+#include <map>
 #include <memory>
 #include "control/database/supabaseclient.h"
 #include "control/database/realtimeclient.h"
@@ -56,7 +56,7 @@ private:
     SupabaseClient *m_client;
     RealtimeClient *m_realtime;
     CallParticipantModel m_participants;
-    QMap<QString, std::unique_ptr<WebRtcPeerConnection>> m_peers;
+    std::map<QString, std::unique_ptr<WebRtcPeerConnection>> m_peers;
 
     QString m_callId;
     QString m_signalingTopic;
