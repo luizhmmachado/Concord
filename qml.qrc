@@ -1,0 +1,19 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>style/Theme.qml</file>
+        <file>style/qmldir</file>
+        <file>ui/LoginPage.qml</file>
+        <file>ui/RegisterPage.qml</file>
+        <file>ui/MainWindow.qml</file>
+        <file>ui/ServerSidebar.qml</file>
+        <file>ui/ChannelSidebar.qml</file>
+        <file>ui/ChatView.qml</file>
+        <file>ui/CallView.qml</file>
+        <file>ui/SettingsPage.qml</file>
+        <file>ui/Components/qmldir</file>
+        <file>ui/Components/AppButton.qml</file>
+        <file>ui/Components/AppTextField.qml</file>
+        <file>ui/Components/Avatar.qml</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,4 @@
+module Concord.UI.Components
+AppButton 1.0 AppButton.qml
+AppTextField 1.0 AppTextField.qml
+Avatar 1.0 Avatar.qml
