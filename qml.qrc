@@ -18,5 +18,6 @@
         <file>ui/Components/AppButton.qml</file>
         <file>ui/Components/AppTextField.qml</file>
         <file>ui/Components/Avatar.qml</file>
+        <file>ui/Components/ComponentPopup.qml</file>
     </qresource>
 </RCC>

@@ -268,23 +268,12 @@ Rectangle {
         }
     }
 
-    Popup {
+    ComponentPopup {
         id: sourcePicker
-        parent: Overlay.overlay
-        anchors.centerIn: parent
         width: 520
         height: 460
-        modal: true
-        focus: true
         padding: 0
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-        background: Rectangle {
-            color: Theme.surface
-            radius: Theme.radiusMedium
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.12)
-        }
 
         property int selectedIndex: -1
 

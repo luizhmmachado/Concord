@@ -5,15 +5,11 @@ import "qrc:/style"
 import "qrc:/ui/Components"
 
 // Discord-style invite sheet: pick a friend to DM the invite to, or copy the link.
-Popup {
+ComponentPopup {
     id: root
-    modal: true
-    focus: true
     padding: 0
     width: 460
     height: 540
-    anchors.centerIn: Overlay.overlay
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
     readonly property string inviteLink: "concord://invite/" + serverController.currentServerInviteCode
 
@@ -22,13 +18,6 @@ Popup {
     onOpened: {
         sentToConversationId = ""
         directMessageController.loadConversations()
-    }
-
-    background: Rectangle {
-        color: Theme.surface
-        radius: Theme.radiusMedium
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.12)
     }
 
     ColumnLayout {
