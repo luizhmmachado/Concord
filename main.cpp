@@ -14,6 +14,8 @@
 #include "control/database/realtimeclient.h"
 #include "control/auth/authcontroller.h"
 #include "control/servers/servercontroller.h"
+#include "control/servers/servermemberscontroller.h"
+#include "control/presence/onlinepresencecontroller.h"
 #include "control/chat/chatcontroller.h"
 #include "control/dm/directmessagecontroller.h"
 #include "control/settings/settingscontroller.h"
@@ -108,13 +110,22 @@ int main(int argc, char *argv[])
     SettingsController settingsController(&supabaseClient);
     CallController callController(&supabaseClient, &realtimeClient);
     CallPresenceController callPresenceController(&supabaseClient, &realtimeClient);
+    OnlinePresenceController onlinePresenceController(&supabaseClient, &realtimeClient);
+    ServerMembersController serverMembersController(&supabaseClient, &realtimeClient,
+                                                     &onlinePresenceController);
     MediaDeviceController mediaDeviceController;
 
     QObject::connect(&authController, &AuthController::authenticatedChanged, [&]() {
-        if (!authController.isAuthenticated())
+        if (!authController.isAuthenticated()) {
+            onlinePresenceController.clear();
             return;
+        }
         realtimeClient.connectToServer(kSupabaseUrl, kSupabaseAnonKey, supabaseClient.accessToken());
         settingsController.syncFromRemote();
+
+        const QString name = !authController.displayName().isEmpty() ? authController.displayName()
+                                                                     : authController.username();
+        onlinePresenceController.setLocalUser(authController.userId(), name);
     });
 
     QObject::connect(&authController, &AuthController::profileChanged, [&]() {
@@ -123,6 +134,8 @@ int main(int argc, char *argv[])
         if (!name.isEmpty())
             callController.setLocalDisplayName(name);
         directMessageController.setLocalDisplayName(name);
+        if (authController.isAuthenticated())
+            onlinePresenceController.setLocalUser(authController.userId(), name);
     });
 
     QObject::connect(&app, &QGuiApplication::aboutToQuit, [&]() {
@@ -138,6 +151,8 @@ int main(int argc, char *argv[])
     ctx->setContextProperty("realtimeClient", &realtimeClient);
     ctx->setContextProperty("authController", &authController);
     ctx->setContextProperty("serverController", &serverController);
+    ctx->setContextProperty("serverMembers", &serverMembersController);
+    ctx->setContextProperty("onlinePresence", &onlinePresenceController);
     ctx->setContextProperty("chatController", &chatController);
     ctx->setContextProperty("directMessageController", &directMessageController);
     ctx->setContextProperty("settingsController", &settingsController);
@@ -154,6 +169,7 @@ int main(int argc, char *argv[])
     // Explicit, ordered shutdown to avoid GStreamer pipelines/sockets
     // outliving the Qt event loop.
     callController.leaveCall();
+    onlinePresenceController.clear();
     realtimeClient.disconnectFromServer();
 #if CONCORD_HAS_GSTREAMER
     gst_deinit();

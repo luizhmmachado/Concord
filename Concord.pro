@@ -13,6 +13,10 @@ SOURCES += \
     control/servers/servercontroller.cpp \
     control/servers/serverlistmodel.cpp \
     control/servers/channellistmodel.cpp \
+    control/servers/servermembermodel.cpp \
+    control/servers/serverrolemodel.cpp \
+    control/servers/servermemberscontroller.cpp \
+    control/presence/onlinepresencecontroller.cpp \
     control/chat/chatcontroller.cpp \
     control/chat/messagelistmodel.cpp \
     control/dm/directmessagecontroller.cpp \
@@ -34,6 +38,10 @@ HEADERS += \
     control/servers/servercontroller.h \
     control/servers/serverlistmodel.h \
     control/servers/channellistmodel.h \
+    control/servers/servermembermodel.h \
+    control/servers/serverrolemodel.h \
+    control/servers/servermemberscontroller.h \
+    control/presence/onlinepresencecontroller.h \
     control/chat/chatcontroller.h \
     control/chat/messagelistmodel.h \
     control/dm/directmessagecontroller.h \

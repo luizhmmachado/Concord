@@ -9,6 +9,7 @@
         <file>ui/MainWindow.qml</file>
         <file>ui/ServerSidebar.qml</file>
         <file>ui/ChannelSidebar.qml</file>
+        <file>ui/MemberSidebar.qml</file>
         <file>ui/ChatView.qml</file>
         <file>ui/CallView.qml</file>
         <file>ui/DirectMessagesView.qml</file>
@@ -19,5 +20,6 @@
         <file>ui/Components/AppTextField.qml</file>
         <file>ui/Components/Avatar.qml</file>
         <file>ui/Components/ComponentPopup.qml</file>
+        <file>ui/Components/MemberListItem.qml</file>
     </qresource>
 </RCC>

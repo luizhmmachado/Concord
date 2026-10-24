@@ -151,6 +151,7 @@ Rectangle {
 
         AppButton {
             text: "+ Canal"
+            visible: serverController.currentServerId.length > 0 && serverMembers.canManageChannels
             baseColor: Theme.surfaceAlt
             onClicked: createChannelDialog.open()
         }
@@ -158,11 +159,9 @@ Rectangle {
 
     ServerInvitePopup { id: serverInvitePopup }
 
-    Dialog {
+    ComponentPopup {
         id: createChannelDialog
         title: "Novo canal"
-        modal: true
-        anchors.centerIn: parent
         standardButtons: Dialog.Ok | Dialog.Cancel
 
         Column {

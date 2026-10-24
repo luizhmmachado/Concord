@@ -90,14 +90,29 @@ Rectangle {
         }
     }
 
+    MemberSidebar {
+        id: memberSidebar
+        visible: !root.showDirectMessages
+                 && serverController.currentServerId.length > 0
+                 && (!callController.inCall || root.activeChannelType === "text")
+        width: visible ? 240 : 0
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+    }
+
     Loader {
         anchors.left: channelSidebar.right
         anchors.top: parent.top
-        anchors.right: parent.right
+        anchors.right: memberSidebar.left
         anchors.bottom: parent.bottom
         sourceComponent: {
             if (root.showDirectMessages)
                 return directMessagesComponent
+            // A text channel takes precedence over the call view so the user
+            // can read messages (and keep the member sidebar) while in a call.
+            if (root.activeChannelType === "text")
+                return chatViewComponent
             if (root.activeChannelType === "voice" || callController.inCall)
                 return callViewComponent
             if (root.activeChannelId.length > 0)
@@ -131,11 +146,9 @@ Rectangle {
         SettingsPage { onCloseRequested: root.showSettings = false }
     }
 
-    Dialog {
+    ComponentPopup {
         id: createServerDialog
         title: "Servidores"
-        modal: true
-        anchors.centerIn: parent
         standardButtons: Dialog.Close
 
         Column {

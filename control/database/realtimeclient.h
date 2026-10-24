@@ -7,6 +7,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QHash>
+#include <QSet>
 #include <QPointer>
 
 // Minimal client for Supabase Realtime (Phoenix channels protocol).
@@ -28,13 +29,19 @@ public:
 
     // Joins a realtime topic. `postgresChanges` declares the table
     // subscriptions, e.g. [{event: "INSERT", schema: "public", table: "messages"}];
-    // Supabase ignores changes that were not declared here. `presenceKey`
-    // enables Presence on the topic, keyed by that value.
-    void joinTopic(const QString &topic, const QJsonArray &postgresChanges = QJsonArray());
+    // Supabase ignores changes that were not declared here. A non-empty
+    // `presenceKey` enables Presence on the topic, keyed by that value.
+    void joinTopic(const QString &topic, const QJsonArray &postgresChanges = QJsonArray(),
+                   const QString &presenceKey = QString());
     void leaveTopic(const QString &topic);
 
     // Sends a broadcast event payload on an already-joined topic.
     void broadcast(const QString &topic, const QString &event, const QJsonObject &payload);
+
+    // Ephemeral Presence: the server keeps the state in memory and removes it
+    // when the websocket disconnects, so it never touches Postgres.
+    void trackPresence(const QString &topic, const QJsonObject &state);
+    void untrackPresence(const QString &topic);
 
 signals:
     void connected();
@@ -42,6 +49,10 @@ signals:
     void topicJoined(const QString &topic);
     void broadcastReceived(const QString &topic, const QString &event, const QJsonObject &payload);
     void postgresChange(const QString &topic, const QString &eventType, const QJsonObject &record);
+    // Raw Phoenix Presence payloads: {key: {metas: [...]}} and
+    // {joins: {...}, leaves: {...}} respectively.
+    void presenceState(const QString &topic, const QJsonObject &state);
+    void presenceDiff(const QString &topic, const QJsonObject &diff);
 
 private slots:
     void onConnected();
@@ -51,6 +62,7 @@ private slots:
 
 private:
     void sendMessage(const QString &topic, const QString &event, const QJsonObject &payload);
+    void sendPresence(const QString &topic, const QString &event, const QJsonObject &state = QJsonObject());
     int nextRef();
 
     QWebSocket m_socket;
@@ -65,6 +77,11 @@ private:
     QHash<QString, QJsonArray> m_topicChanges;
     // Phoenix matches later messages to a channel by the join's ref.
     QHash<QString, QString> m_topicJoinRefs;
+    // Presence is per channel: the key identifies us, the state is replayed on
+    // every (re)join because the server forgets it when the socket drops.
+    QHash<QString, QString> m_presenceKeys;
+    QHash<QString, QJsonObject> m_presenceStates;
+    QSet<QString> m_acknowledgedTopics;
 };
 
 #endif // REALTIMECLIENT_H
