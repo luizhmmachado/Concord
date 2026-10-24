@@ -15,9 +15,12 @@ Makefile*
 /build
 /debug
 /release
+/dist
 .env
 .vscode/
 *.suo
 *.log
 .qtc_clangd/
 object_script.*
+__pycache__/
+*.pyc

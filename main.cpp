@@ -6,6 +6,11 @@
 #include <QPixmap>
 #include <QScreen>
 #include <QFile>
+#include <QDir>
+#ifndef APP_VERSION
+#define APP_VERSION "0.0.0"
+#endif
+
 #if CONCORD_HAS_GSTREAMER
 #include <gst/gst.h>
 #endif
@@ -73,8 +78,42 @@ public:
     }
 };
 
+#if CONCORD_HAS_GSTREAMER && defined(Q_OS_WIN)
+static void configureBundledGStreamer()
+{
+    // The release archive ships the GStreamer runtime next to the executable.
+    // Point GStreamer at those plugins instead of requiring a system-wide
+    // installation or the environment variables set by its installer.
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString pluginDir = QDir(appDir).filePath(QStringLiteral("lib/gstreamer-1.0"));
+    if (!QDir(pluginDir).exists())
+        return;
+
+    const QByteArray pluginPath = QDir::toNativeSeparators(pluginDir).toLocal8Bit();
+    qputenv("GST_PLUGIN_PATH_1_0", pluginPath);
+    qputenv("GST_PLUGIN_SYSTEM_PATH_1_0", pluginPath);
+    qputenv("GST_PLUGIN_PATH", pluginPath);
+    qputenv("GST_PLUGIN_SYSTEM_PATH", pluginPath);
+
+    const QString scanner = QDir(appDir).filePath(
+        QStringLiteral("libexec/gstreamer-1.0/gst-plugin-scanner.exe"));
+    if (QFile::exists(scanner)) {
+        const QByteArray scannerPath = QDir::toNativeSeparators(scanner).toLocal8Bit();
+        qputenv("GST_PLUGIN_SCANNER_1_0", scannerPath);
+        qputenv("GST_PLUGIN_SCANNER", scannerPath);
+    }
+
+    QByteArray path = qgetenv("PATH");
+    if (!path.isEmpty())
+        path.prepend(';');
+    path.prepend(QDir::toNativeSeparators(appDir).toLocal8Bit());
+    qputenv("PATH", path);
+}
+#endif
+
 int main(int argc, char *argv[])
 {
+#ifdef Q_OS_LINUX
     // Qt 5.15's qt_readlink() reads /etc/localtime into a 256-byte buffer in a
     // way that recent glibc's _FORTIFY_SOURCE aborts on. Populating TZ makes
     // QTimeZone skip that code path entirely.
@@ -86,14 +125,19 @@ int main(int argc, char *argv[])
                 qputenv("TZ", zone);
         }
     }
-
-#if CONCORD_HAS_GSTREAMER
-    gst_init(&argc, &argv);
 #endif
 
     QGuiApplication app(argc, argv);
     QCoreApplication::setOrganizationName("Concord");
     QCoreApplication::setApplicationName("Concord");
+    QCoreApplication::setApplicationVersion(QStringLiteral(APP_VERSION));
+
+#if CONCORD_HAS_GSTREAMER
+#ifdef Q_OS_WIN
+    configureBundledGStreamer();
+#endif
+    gst_init(&argc, &argv);
+#endif
 
     // All controllers below are parented to `app`/the engine's lifetime via
     // being declared on the stack in main() and outliving the engine, which

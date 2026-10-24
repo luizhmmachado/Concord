@@ -6,6 +6,7 @@
 
 #if defined(Q_OS_LINUX)
 #include <xcb/xcb.h>
+#include <cstdlib>
 #include <cstring>
 #endif
 

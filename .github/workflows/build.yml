@@ -1,0 +1,239 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version for a manual build (for example 0.1.0)
+        required: false
+        default: "0.0.0"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QT_VERSION: "5.15.2"
+  GSTREAMER_VERSION: "1.28.8"
+
+jobs:
+  linux:
+    name: Linux (.deb)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config dpkg-dev \
+            qt5-qmake qtbase5-dev qtbase5-dev-tools qtdeclarative5-dev \
+            qtquickcontrols2-5-dev qtmultimedia5-dev \
+            libqt5websockets5-dev \
+            qml-module-qtquick2 qml-module-qtquick-controls2 qml-module-qtquick-layouts \
+            qml-module-qtquick-window2 qml-module-qtquick-dialogs \
+            qml-module-qt-labs-folderlistmodel qml-module-qtmultimedia \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libgstreamer-plugins-bad1.0-dev \
+            gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad gstreamer1.0-x gstreamer1.0-alsa \
+            gstreamer1.0-pulseaudio \
+            libxcb1-dev
+
+      - name: Resolve version
+        id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="${REQUESTED_VERSION:-0.0.0}"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "invalid version: ${VERSION}" >&2
+            exit 1
+          fi
+          echo "value=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          mkdir -p build-ci
+          cd build-ci
+          qmake ../Concord.pro CONFIG+=release
+          make -j"$(nproc)"
+
+      - name: Verify GStreamer plugins
+        run: |
+          for feature in webrtcbin vp8enc opusenc autoaudiosrc ximagesrc; do
+            gst-inspect-1.0 "${feature}" >/dev/null
+          done
+
+      - name: Smoke test (headless)
+        run: |
+          set +e
+          QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            ./build-ci/Concord > build-ci/smoke.log 2>&1 &
+          pid=$!
+          sleep 8
+          if kill -0 "${pid}" 2>/dev/null; then
+            kill "${pid}"
+            wait "${pid}" 2>/dev/null
+            echo "Concord started and stayed alive"
+          else
+            cat build-ci/smoke.log
+            exit 1
+          fi
+
+      - name: Package .deb
+        run: |
+          chmod +x packaging/linux/build-deb.sh
+          packaging/linux/build-deb.sh \
+            "${{ steps.version.outputs.value }}" build-ci/Concord dist
+
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Windows (.exe)
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2019_64
+          cache: true
+
+      - name: Install GStreamer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://gstreamer.freedesktop.org/data/pkg/windows/$env:GSTREAMER_VERSION/msvc/gstreamer-1.0-msvc-x86_64-$env:GSTREAMER_VERSION.exe"
+          $installer = Join-Path $env:RUNNER_TEMP "gstreamer.exe"
+          Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
+          $root = "C:\gstreamer\1.0\msvc_x86_64"
+          $arguments = @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/TYPE=devel",
+            "/DIR=$root",
+            "/CURRENTUSER"
+          )
+          $process = Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "GStreamer installer failed with code $($process.ExitCode)"
+          }
+          if (-not (Test-Path "$root\include\gstreamer-1.0\gst\gst.h")) {
+            throw "GStreamer development files were not installed at $root"
+          }
+          "GSTREAMER_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "$root\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:GITHUB_REF -like "refs/tags/v*") {
+            $version = $env:GITHUB_REF_NAME.Substring(1)
+          } elseif ($env:GITHUB_EVENT_NAME -eq "workflow_dispatch" -and $env:REQUESTED_VERSION) {
+            $version = $env:REQUESTED_VERSION
+          } else {
+            $version = "0.0.0"
+          }
+          if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
+            throw "invalid version: $version"
+          }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build and package
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          .\packaging\windows\build.ps1 `
+            -Version $env:APP_VERSION `
+            -GStreamerRoot $env:GSTREAMER_ROOT
+
+      - name: Upload installer and portable archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Resolve version
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "${GITHUB_OUTPUT}"
+
+      - name: Generate download metadata and checksums
+        run: |
+          set -euo pipefail
+          ls -lh release-assets
+          python3 packaging/release_metadata.py \
+            --dir release-assets \
+            --repo "${GITHUB_REPOSITORY}" \
+            --tag "${GITHUB_REF_NAME}" \
+            --version "${{ steps.version.outputs.value }}"
+          cd release-assets
+          rm -f SHA256SUMS.txt
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Concord ${{ steps.version.outputs.value }}
+          generate_release_notes: true
+          files: release-assets/*
+          fail_on_unmatched_files: true
+          make_latest: true

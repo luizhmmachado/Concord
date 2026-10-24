@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Concord
+GenericName=Chat Client
+Comment=Chat with servers, friends and voice channels
+Exec=concord
+Icon=concord
+Terminal=false
+Categories=Network;Chat;InstantMessaging;
+Keywords=chat;voice;video;discord;supabase;
+StartupNotify=true
+StartupWMClass=Concord
