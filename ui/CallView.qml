@@ -271,13 +271,26 @@ Rectangle {
     ComponentPopup {
         id: sourcePicker
         width: 520
-        height: 460
+        height: 560
         padding: 0
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
         property int selectedIndex: -1
+        property int quality: 1080
+        property int fps: 30
 
-        onOpened: selectedIndex = -1
+        function startShare(index) {
+            callController.screenShareHeight = quality
+            callController.screenShareFps = fps
+            callController.startScreenShare(index)
+            close()
+        }
+
+        onOpened: {
+            selectedIndex = -1
+            quality = callController.screenShareHeight
+            fps = callController.screenShareFps
+        }
 
         ColumnLayout {
             anchors.fill: parent
@@ -332,12 +345,59 @@ Rectangle {
 
                     TapHandler {
                         onTapped: sourcePicker.selectedIndex = index
-                        onDoubleTapped: {
-                            callController.startScreenShare(index)
-                            sourcePicker.close()
-                        }
+                        onDoubleTapped: sourcePicker.startShare(index)
                     }
                 }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Text {
+                    text: "Qualidade"
+                    color: Theme.textSecondary
+                    font.pixelSize: 13
+                    Layout.preferredWidth: 76
+                }
+                AppButton {
+                    text: "720p"
+                    baseColor: sourcePicker.quality === 720 ? Theme.accent : Theme.surfaceAlt
+                    textColor: sourcePicker.quality === 720 ? "white" : Theme.textPrimary
+                    onClicked: sourcePicker.quality = 720
+                }
+                AppButton {
+                    text: "1080p"
+                    baseColor: sourcePicker.quality === 1080 ? Theme.accent : Theme.surfaceAlt
+                    textColor: sourcePicker.quality === 1080 ? "white" : Theme.textPrimary
+                    onClicked: sourcePicker.quality = 1080
+                }
+                Item { Layout.fillWidth: true }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Text {
+                    text: "Quadros/s"
+                    color: Theme.textSecondary
+                    font.pixelSize: 13
+                    Layout.preferredWidth: 76
+                }
+                AppButton {
+                    text: "30 fps"
+                    baseColor: sourcePicker.fps === 30 ? Theme.accent : Theme.surfaceAlt
+                    textColor: sourcePicker.fps === 30 ? "white" : Theme.textPrimary
+                    onClicked: sourcePicker.fps = 30
+                }
+                AppButton {
+                    text: "60 fps"
+                    baseColor: sourcePicker.fps === 60 ? Theme.accent : Theme.surfaceAlt
+                    textColor: sourcePicker.fps === 60 ? "white" : Theme.textPrimary
+                    onClicked: sourcePicker.fps = 60
+                }
+                Item { Layout.fillWidth: true }
             }
 
             RowLayout {
@@ -356,10 +416,7 @@ Rectangle {
                     baseColor: Theme.accent
                     enabled: sourcePicker.selectedIndex >= 0
                     opacity: enabled ? 1 : 0.5
-                    onClicked: {
-                        callController.startScreenShare(sourcePicker.selectedIndex)
-                        sourcePicker.close()
-                    }
+                    onClicked: sourcePicker.startShare(sourcePicker.selectedIndex)
                 }
             }
         }

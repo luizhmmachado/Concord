@@ -2,6 +2,7 @@
 
 #include <QUuid>
 #include <QJsonDocument>
+#include <QSettings>
 #include <QDebug>
 
 CallController::CallController(SupabaseClient *client, RealtimeClient *realtime, QObject *parent)
@@ -11,6 +12,14 @@ CallController::CallController(SupabaseClient *client, RealtimeClient *realtime,
 {
     qInfo().noquote() << "CallController::CallController" << "client=" << client << "realtime=" << realtime;
     connect(&m_media, &CallMediaEngine::errorOccurred, this, &CallController::errorOccurred);
+
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("calls"));
+    m_media.setScreenShareSettings(settings.value(QStringLiteral("screenShareHeight"), 1080).toInt(),
+                                   settings.value(QStringLiteral("screenShareFps"), 30).toInt());
+    settings.endGroup();
+    m_screenShareHeight = m_media.screenShareHeight();
+    m_screenShareFps = m_media.screenShareFps();
 
     connect(m_realtime, &RealtimeClient::topicJoined, this, [this](const QString &topic) {
         if (topic == m_signalingTopic)
@@ -337,6 +346,43 @@ void CallController::toggleCamera()
     emit cameraEnabledChanged();
 }
 
+void CallController::setScreenShareHeight(int height)
+{
+    qInfo().noquote() << "CallController::setScreenShareHeight" << "height=" << height;
+    const int normalized = height >= 1080 ? 1080 : 720;
+    if (normalized == m_screenShareHeight)
+        return;
+    m_screenShareHeight = normalized;
+    m_media.setScreenShareSettings(m_screenShareHeight, m_screenShareFps);
+    m_screenShareHeight = m_media.screenShareHeight();
+    persistScreenShareSettings();
+    emit screenShareSettingsChanged();
+}
+
+void CallController::setScreenShareFps(int fps)
+{
+    qInfo().noquote() << "CallController::setScreenShareFps" << "fps=" << fps;
+    const int normalized = fps >= 60 ? 60 : 30;
+    if (normalized == m_screenShareFps)
+        return;
+    m_screenShareFps = normalized;
+    m_media.setScreenShareSettings(m_screenShareHeight, m_screenShareFps);
+    m_screenShareFps = m_media.screenShareFps();
+    persistScreenShareSettings();
+    emit screenShareSettingsChanged();
+}
+
+void CallController::persistScreenShareSettings()
+{
+    qInfo().noquote() << "CallController::persistScreenShareSettings"
+                      << "height=" << m_screenShareHeight << "fps=" << m_screenShareFps;
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("calls"));
+    settings.setValue(QStringLiteral("screenShareHeight"), m_screenShareHeight);
+    settings.setValue(QStringLiteral("screenShareFps"), m_screenShareFps);
+    settings.endGroup();
+}
+
 void CallController::toggleScreenShare()
 {
     qInfo().noquote() << "CallController::toggleScreenShare";
@@ -357,16 +403,19 @@ void CallController::startScreenShare(int sourceIndex)
     const ScreenShareSource &source = m_screenShareSources.at(sourceIndex);
     QString capture;
 #ifdef Q_OS_LINUX
+    // XDamage only pushes frames when the source actually changes, which keeps
+    // idle desktops cheap and leaves more CPU for the encoder at 60 fps.
     if (source.kind == ScreenShareSource::Window) {
-        capture = QStringLiteral("ximagesrc use-damage=false xid=%1").arg(source.windowId);
+        capture = QStringLiteral("ximagesrc use-damage=true xid=%1").arg(source.windowId);
     } else {
-        capture = QStringLiteral("ximagesrc use-damage=false startx=%1 starty=%2 endx=%3 endy=%4")
+        capture = QStringLiteral("ximagesrc use-damage=true startx=%1 starty=%2 endx=%3 endy=%4")
                       .arg(source.x)
                       .arg(source.y)
                       .arg(source.x + source.width - 1)
                       .arg(source.y + source.height - 1);
     }
 #endif
+    m_media.setScreenShareSettings(m_screenShareHeight, m_screenShareFps);
     m_media.setScreenCaptureDescription(capture);
 
     m_screenSharing = true;

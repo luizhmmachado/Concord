@@ -38,6 +38,11 @@ public:
     // Overrides the source used by the next screen-share start. An empty
     // description falls back to capturing the whole primary screen.
     void setScreenCaptureDescription(const QString &description);
+    // Capture height (720/1080) and frame rate (30/60) for screen sharing.
+    // Invalid values are rounded to the nearest supported option.
+    void setScreenShareSettings(int height, int fps);
+    int screenShareHeight() const { return m_screenShareHeight; }
+    int screenShareFps() const { return m_screenShareFps; }
     void setMicMuted(bool muted);
 
 #if CONCORD_HAS_GSTREAMER
@@ -66,6 +71,7 @@ private:
     void removeLiveSource(GstElement **source, GstElement *selector, GstPad **pad);
     void selectPad(GstElement *selector, GstPad *pad);
     GstElement *attachBranch(GstElement *tee, const QString &description, PeerBranches &peer);
+    void applyScreenShareEncoding();
 
     GstElement *m_pipeline = nullptr;
     GstElement *m_cameraSelector = nullptr;
@@ -88,6 +94,8 @@ private:
     VideoStreamSource *m_cameraPreview = nullptr;
     VideoStreamSource *m_screenPreview = nullptr;
     QString m_screenCaptureDescription;
+    int m_screenShareHeight = 1080;
+    int m_screenShareFps = 30;
     bool m_cameraEnabled = false;
     bool m_screenSharing = false;
     bool m_micMuted = false;

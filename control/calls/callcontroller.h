@@ -23,6 +23,8 @@ class CallController : public QObject
     Q_PROPERTY(bool micMuted READ micMuted NOTIFY micMutedChanged)
     Q_PROPERTY(bool cameraEnabled READ cameraEnabled NOTIFY cameraEnabledChanged)
     Q_PROPERTY(bool screenSharing READ screenSharing NOTIFY screenSharingChanged)
+    Q_PROPERTY(int screenShareHeight READ screenShareHeight WRITE setScreenShareHeight NOTIFY screenShareSettingsChanged)
+    Q_PROPERTY(int screenShareFps READ screenShareFps WRITE setScreenShareFps NOTIFY screenShareSettingsChanged)
     Q_PROPERTY(QString callChannelId READ callChannelId NOTIFY callChannelIdChanged)
     Q_PROPERTY(CallParticipantModel *participants READ participants CONSTANT)
     Q_PROPERTY(QObject *screenSource READ screenSource CONSTANT)
@@ -41,6 +43,10 @@ public:
     bool micMuted() const { return m_micMuted; }
     bool cameraEnabled() const { return m_cameraEnabled; }
     bool screenSharing() const { return m_screenSharing; }
+    int screenShareHeight() const { return m_screenShareHeight; }
+    int screenShareFps() const { return m_screenShareFps; }
+    void setScreenShareHeight(int height);
+    void setScreenShareFps(int fps);
     QString callChannelId() const { return m_callChannelId; }
     // Server that owns the voice channel; used to publish ephemeral presence.
     QString callServerId() const { return m_callServerId; }
@@ -74,6 +80,7 @@ signals:
     void micMutedChanged();
     void cameraEnabledChanged();
     void screenSharingChanged();
+    void screenShareSettingsChanged();
     void callChannelIdChanged();
     void localDisplayNameChanged();
     void activeScreenChanged();
@@ -91,6 +98,7 @@ private:
     void applyLocalStateToAllPeers();
     void updateLocalParticipantState();
     void broadcastLocalState();
+    void persistScreenShareSettings();
 
     SupabaseClient *m_client;
     RealtimeClient *m_realtime;
@@ -107,6 +115,8 @@ private:
     bool m_micMuted = false;
     bool m_cameraEnabled = false;
     bool m_screenSharing = false;
+    int m_screenShareHeight = 1080;
+    int m_screenShareFps = 30;
     QString m_localParticipantId;
     QString m_localDisplayName;
     QString m_activeScreenOwner;

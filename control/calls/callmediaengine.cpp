@@ -20,6 +20,28 @@ namespace {
 
 const char *kStunServer = "stun://stun.l.google.com:19302";
 
+constexpr int kScreenShare720p = 720;
+constexpr int kScreenShare1080p = 1080;
+constexpr int kScreenShare30Fps = 30;
+constexpr int kScreenShare60Fps = 60;
+
+int normalizeScreenShareHeight(int height)
+{
+    return height >= kScreenShare1080p ? kScreenShare1080p : kScreenShare720p;
+}
+
+int normalizeScreenShareFps(int fps)
+{
+    return fps >= kScreenShare60Fps ? kScreenShare60Fps : kScreenShare30Fps;
+}
+
+int screenShareBitrate(int height, int fps)
+{
+    if (height >= kScreenShare1080p)
+        return fps >= kScreenShare60Fps ? 8000000 : 5000000;
+    return fps >= kScreenShare60Fps ? 4000000 : 2500000;
+}
+
 #ifdef Q_OS_WIN
 const char *kScreenSrc = "d3d11screencapturesrc show-cursor=true";
 #elif defined(Q_OS_MAC)
@@ -86,13 +108,15 @@ bool CallMediaEngine::start()
         "videotestsrc name=camblack pattern=black is-live=true ! "
         "video/x-raw,width=640,height=480,framerate=15/1 ! videoconvert ! "
         "input-selector name=camsel sync-streams=false ! tee name=camtee allow-not-linked=true "
-        "camtee. ! queue max-size-buffers=2 leaky=downstream ! videoconvert ! "
+        "camtee. ! queue max-size-buffers=1 leaky=downstream ! videoconvert ! "
         "video/x-raw,format=BGRA ! appsink name=campreview "
 
         "videotestsrc name=scrblack pattern=black is-live=true ! "
         "video/x-raw,width=1280,height=720,framerate=15/1 ! videoconvert ! "
         "input-selector name=scrsel sync-streams=false ! tee name=scrtee allow-not-linked=true "
-        "scrtee. ! queue max-size-buffers=2 leaky=downstream ! videoconvert ! "
+        "scrtee. ! queue max-size-buffers=1 leaky=downstream ! videoconvert ! "
+        "videorate drop-only=true ! video/x-raw,framerate=15/1 ! videoscale ! "
+        "video/x-raw,height=720,pixel-aspect-ratio=1/1 ! videoconvert ! "
         "video/x-raw,format=BGRA ! appsink name=scrpreview "
 
         "autoaudiosrc ! queue ! audioconvert ! audioresample ! "
@@ -306,9 +330,12 @@ void CallMediaEngine::setScreenSharingEnabled(bool enabled)
                                     : m_screenCaptureDescription;
         // Only the height is pinned so videoscale keeps the source aspect ratio.
         const QString desc = QStringLiteral(
-                                 "%1 ! videoconvert ! videoscale add-borders=false ! videorate ! "
-                                 "video/x-raw,height=720,pixel-aspect-ratio=1/1,framerate=15/1 ! videoconvert")
-                                 .arg(capture);
+                                 "%1 ! videoconvert ! videorate drop-only=true ! "
+                                 "video/x-raw,framerate=%3/1 ! videoscale add-borders=false ! "
+                                 "video/x-raw,height=%2,pixel-aspect-ratio=1/1 ! videoconvert")
+                                 .arg(capture)
+                                 .arg(m_screenShareHeight)
+                                 .arg(m_screenShareFps);
         m_screenSource = addLiveSource(desc, m_screenSelector, nullptr);
     } else {
         removeLiveSource(&m_screenSource, m_screenSelector, &m_screenLivePad);
@@ -329,6 +356,49 @@ void CallMediaEngine::setScreenCaptureDescription(const QString &description)
     qInfo().noquote() << "CallMediaEngine::setScreenCaptureDescription" << "description=" << description;
     m_screenCaptureDescription = description;
 }
+
+void CallMediaEngine::setScreenShareSettings(int height, int fps)
+{
+    const int normalizedHeight = normalizeScreenShareHeight(height);
+    const int normalizedFps = normalizeScreenShareFps(fps);
+    if (normalizedHeight == m_screenShareHeight && normalizedFps == m_screenShareFps)
+        return;
+
+    qInfo().noquote() << "CallMediaEngine::setScreenShareSettings"
+                      << "height=" << normalizedHeight << "fps=" << normalizedFps;
+    m_screenShareHeight = normalizedHeight;
+    m_screenShareFps = normalizedFps;
+    applyScreenShareEncoding();
+
+    if (m_screenSharing && m_screenSource) {
+        // The capture caps are baked into the live source bin, so rebuild it
+        // to make a settings change take effect immediately.
+        setScreenSharingEnabled(false);
+        setScreenSharingEnabled(true);
+    }
+}
+
+void CallMediaEngine::applyScreenShareEncoding()
+{
+    qInfo().noquote() << "CallMediaEngine::applyScreenShareEncoding"
+                      << "height=" << m_screenShareHeight << "fps=" << m_screenShareFps;
+    const int bitrate = screenShareBitrate(m_screenShareHeight, m_screenShareFps);
+    const int keyframeDistance = m_screenShareFps * 2;
+
+    for (auto &entry : m_peers) {
+        for (GstElement *bin : entry.second.bins) {
+            GstElement *encoder = gst_bin_get_by_name(GST_BIN(bin), "screenenc");
+            if (!encoder)
+                continue;
+            g_object_set(encoder,
+                         "target-bitrate", bitrate,
+                         "keyframe-max-dist", keyframeDistance,
+                         nullptr);
+            gst_object_unref(encoder);
+        }
+    }
+}
+
 GstElement *CallMediaEngine::attachBranch(GstElement *tee, const QString &description, PeerBranches &peer)
 {
     qInfo().noquote() << "CallMediaEngine::attachBranch" << "description=" << description;
@@ -414,17 +484,22 @@ GstElement *CallMediaEngine::createPeerBin(const QString &peerId)
                  peer);
 
     attachBranch(m_cameraTee,
-                 QStringLiteral("queue max-size-buffers=5 leaky=downstream ! videoconvert ! "
-                                "vp8enc deadline=1 keyframe-max-dist=30 target-bitrate=1000000 ! "
+                 QStringLiteral("queue max-size-buffers=3 leaky=downstream ! videoconvert ! "
+                                "vp8enc deadline=1 cpu-used=16 lag-in-frames=0 error-resilient=1 "
+                                "keyframe-max-dist=30 target-bitrate=1000000 ! "
                                 "rtpvp8pay pt=96 ! "
                                 "application/x-rtp,media=video,encoding-name=VP8,payload=96 ! queue"),
                  peer);
 
+    const int screenBitrate = screenShareBitrate(m_screenShareHeight, m_screenShareFps);
     attachBranch(m_screenTee,
-                 QStringLiteral("queue max-size-buffers=5 leaky=downstream ! videoconvert ! "
-                                "vp8enc deadline=1 keyframe-max-dist=30 target-bitrate=2500000 ! "
+                 QStringLiteral("queue max-size-buffers=3 leaky=downstream ! videoconvert ! "
+                                "vp8enc name=screenenc deadline=1 cpu-used=16 lag-in-frames=0 "
+                                "error-resilient=1 keyframe-max-dist=%1 target-bitrate=%2 ! "
                                 "rtpvp8pay pt=97 ! "
-                                "application/x-rtp,media=video,encoding-name=VP8,payload=97 ! queue"),
+                                "application/x-rtp,media=video,encoding-name=VP8,payload=97 ! queue")
+                     .arg(m_screenShareFps * 2)
+                     .arg(screenBitrate),
                  peer);
 
     // Deliberately left in NULL state: on-negotiation-needed would fire before
@@ -515,6 +590,13 @@ void CallMediaEngine::setScreenCaptureDescription(const QString &description)
 {
     qInfo().noquote() << "CallMediaEngine::setScreenCaptureDescription" << "description=" << description;
     m_screenCaptureDescription = description;
+}
+
+void CallMediaEngine::setScreenShareSettings(int height, int fps)
+{
+    qInfo().noquote() << "CallMediaEngine::setScreenShareSettings" << "height=" << height << "fps=" << fps;
+    m_screenShareHeight = height >= 1080 ? 1080 : 720;
+    m_screenShareFps = fps >= 60 ? 60 : 30;
 }
 
 void *CallMediaEngine::createPeerBin(const QString &peerId)
