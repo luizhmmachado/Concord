@@ -53,6 +53,15 @@ Copy-Item $exe.FullName (Join-Path $distPath "Concord.exe") -Force
 & windeployqt --release --no-translations --compiler-runtime --qmldir $root --dir $distPath $exe.FullName
 if ($LASTEXITCODE -ne 0) { throw "windeployqt failed" }
 
+# windeployqt only deploys the platform plugin matching the local session, but
+# the smoke test runs with QT_QPA_PLATFORM=offscreen on a headless runner.
+$qtPlugins = (& qmake -query QT_INSTALL_PLUGINS).Trim()
+$offscreenPlugin = Join-Path $qtPlugins "platforms\qoffscreen.dll"
+if (-not (Test-Path $offscreenPlugin)) {
+    throw "qoffscreen platform plugin not found at $offscreenPlugin"
+}
+Copy-Item $offscreenPlugin (Join-Path $distPath "platforms") -Force
+
 Copy-Item "$GStreamerRoot\bin\*.dll" $distPath -Force
 $pluginDir = Join-Path $distPath "lib\gstreamer-1.0"
 $scannerDir = Join-Path $distPath "libexec\gstreamer-1.0"
@@ -92,12 +101,16 @@ try {
 
 $env:QT_QPA_PLATFORM = "offscreen"
 $env:QT_QUICK_BACKEND = "software"
+# Qt GUI applications on Windows log to the debugger instead of stderr unless
+# this is set, which would hide QML errors from the smoke test.
+$env:QT_FORCE_STDERR_LOGGING = "1"
 $smokeOut = Join-Path $buildPath "smoke.out.log"
 $smokeErr = Join-Path $buildPath "smoke.err.log"
 $proc = Start-Process -FilePath (Join-Path $distPath "Concord.exe") -PassThru `
     -RedirectStandardOutput $smokeOut -RedirectStandardError $smokeErr
 Start-Sleep -Seconds 8
 if ($proc.HasExited) {
+    Write-Host "Concord exited with code $($proc.ExitCode)"
     Get-Content $smokeOut, $smokeErr -ErrorAction SilentlyContinue
     throw "Concord exited during the smoke test with code $($proc.ExitCode)"
 }
