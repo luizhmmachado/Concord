@@ -66,7 +66,7 @@ if (Test-Path "$GStreamerRoot\share\gstreamer-1.0") {
 }
 
 $deps = & dumpbin /dependents $exe.FullName | Out-String
-if ($deps -notmatch "gstreamer-1\.0\.dll") {
+if ($deps -notmatch "gstreamer-1\.0") {
     throw "Concord.exe was built without GStreamer"
 }
 
