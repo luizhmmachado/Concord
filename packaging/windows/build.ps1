@@ -106,6 +106,11 @@ try {
     Remove-Item (Join-Path $distPath "gst-inspect-1.0.exe") -Force -ErrorAction SilentlyContinue
 }
 
+# install-qt-action exports paths pointing at the SDK installation. Clear them
+# so the smoke test exercises the bundled qml/plugins instead of the SDK.
+foreach ($name in @("QML2_IMPORT_PATH", "QML_IMPORT_PATH", "QT_PLUGIN_PATH")) {
+    Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+}
 $env:QT_QPA_PLATFORM = "offscreen"
 $env:QT_QUICK_BACKEND = "software"
 # Qt GUI applications on Windows log to the debugger instead of stderr unless
