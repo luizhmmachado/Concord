@@ -97,13 +97,10 @@ Copy-Item "$GStreamerRoot\bin\*.dll" $distPath -Force
 $pluginDir = Join-Path $distPath "lib\gstreamer-1.0"
 $scannerDir = Join-Path $distPath "libexec\gstreamer-1.0"
 New-Item -ItemType Directory -Force $pluginDir, $scannerDir | Out-Null
-Copy-Item "$GStreamerRoot\lib\gstreamer-1.0\*" $pluginDir -Recurse -Force
-Copy-Item "$GStreamerRoot\libexec\gstreamer-1.0\*" $scannerDir -Recurse -Force
-if (Test-Path "$GStreamerRoot\share\gstreamer-1.0") {
-    $shareDir = Join-Path $distPath "share"
-    New-Item -ItemType Directory -Force $shareDir | Out-Null
-    Copy-Item "$GStreamerRoot\share\gstreamer-1.0" $shareDir -Recurse -Force
-}
+# The GStreamer devel package also contains .a import libraries and headers in
+# these directories; only the runtime DLLs and plugin scanner are needed.
+Copy-Item "$GStreamerRoot\lib\gstreamer-1.0\*.dll" $pluginDir -Force
+Copy-Item "$GStreamerRoot\libexec\gstreamer-1.0\gst-plugin-scanner.exe" $scannerDir -Force
 
 $deps = & dumpbin /dependents $exe.FullName | Out-String
 if ($deps -notmatch "gstreamer-1\.0") {
@@ -128,6 +125,16 @@ try {
     }
 } finally {
     Remove-Item (Join-Path $distPath "gst-inspect-1.0.exe") -Force -ErrorAction SilentlyContinue
+}
+
+$staticLibs = Get-ChildItem $distPath -Recurse -Filter *.a
+if ($staticLibs) {
+    throw "Static GStreamer libraries leaked into the package: $($staticLibs[0].FullName)"
+}
+$deployedBytes = (Get-ChildItem $distPath -Recurse -File | Measure-Object Length -Sum).Sum
+Write-Host ("Deployed runtime size: {0:N1} MB" -f ($deployedBytes / 1MB))
+if ($deployedBytes -gt 600MB) {
+    throw "Deployed runtime is unexpectedly large: $([math]::Round($deployedBytes / 1MB)) MB"
 }
 
 # install-qt-action exports paths pointing at the SDK installation. Clear them
