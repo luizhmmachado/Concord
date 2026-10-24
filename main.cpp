@@ -7,6 +7,9 @@
 #include <QScreen>
 #include <QFile>
 #include <QDir>
+#include <QSslSocket>
+
+#include <cstdio>
 #ifndef APP_VERSION
 #define APP_VERSION "0.0.0"
 #endif
@@ -131,6 +134,17 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("Concord");
     QCoreApplication::setApplicationName("Concord");
     QCoreApplication::setApplicationVersion(QStringLiteral(APP_VERSION));
+
+    // Lets CI verify that Qt's TLS backend can load its runtime libraries
+    // (Qt 5.15 needs OpenSSL 1.1 on Windows) without opening the UI.
+    if (app.arguments().contains(QStringLiteral("--ssl-check"))) {
+        const bool supported = QSslSocket::supportsSsl();
+        const QByteArray version = QSslSocket::sslLibraryVersionString().toUtf8();
+        std::fprintf(stdout, "ssl_supported=%d\n", supported ? 1 : 0);
+        std::fprintf(stdout, "ssl_version=%s\n", version.constData());
+        std::fflush(stdout);
+        return supported ? 0 : 1;
+    }
 
 #if CONCORD_HAS_GSTREAMER
 #ifdef Q_OS_WIN

@@ -4,6 +4,7 @@ param(
 
     [string]$QtBin = "",
     [string]$GStreamerRoot = $env:GSTREAMER_ROOT,
+    [string]$OpenSsl1Dir = $env:OPENSSL_1_1_DIR,
     [string]$BuildDir = "build-ci",
     [string]$DistDir = "dist",
     [string]$ReleaseDir = "release"
@@ -58,6 +59,29 @@ $qtBin = Split-Path ((Get-Command qmake).Source) -Parent
 $widgetsDll = Join-Path $qtBin "Qt5Widgets.dll"
 if (Test-Path $widgetsDll) {
     Copy-Item $widgetsDll $distPath -Force
+}
+
+# Qt 5.15.2 loads OpenSSL 1.1 dynamically on Windows, while GStreamer ships
+# OpenSSL 3 under different file names. Without these DLLs all HTTPS requests
+# fail (including Supabase login), even though GStreamer keeps working.
+$openSslNames = @("libssl-1_1-x64.dll", "libcrypto-1_1-x64.dll")
+if (-not $OpenSsl1Dir) {
+    foreach ($candidate in @($qtBin, (Join-Path $env:ProgramFiles "OpenSSL-Win64\bin"))) {
+        if ($candidate -and (Test-Path (Join-Path $candidate $openSslNames[0]))) {
+            $OpenSsl1Dir = $candidate
+            break
+        }
+    }
+}
+if (-not $OpenSsl1Dir) {
+    throw "OpenSSL 1.1 not found. Set OPENSSL_1_1_DIR to the directory containing libssl-1_1-x64.dll and libcrypto-1_1-x64.dll."
+}
+foreach ($name in $openSslNames) {
+    $source = Join-Path $OpenSsl1Dir $name
+    if (-not (Test-Path $source)) {
+        throw "Missing $name in $OpenSsl1Dir"
+    }
+    Copy-Item $source $distPath -Force
 }
 
 # windeployqt only deploys the platform plugin matching the local session, but
@@ -116,6 +140,16 @@ $env:QT_QUICK_BACKEND = "software"
 # Qt GUI applications on Windows log to the debugger instead of stderr unless
 # this is set, which would hide QML errors from the smoke test.
 $env:QT_FORCE_STDERR_LOGGING = "1"
+
+$sslOut = Join-Path $buildPath "ssl-check.out.log"
+$sslErr = Join-Path $buildPath "ssl-check.err.log"
+$sslProc = Start-Process -FilePath (Join-Path $distPath "Concord.exe") -ArgumentList "--ssl-check" `
+    -PassThru -Wait -RedirectStandardOutput $sslOut -RedirectStandardError $sslErr
+Get-Content $sslOut, $sslErr -ErrorAction SilentlyContinue
+if ($sslProc.ExitCode -ne 0) {
+    throw "Qt TLS backend is not usable (exit code $($sslProc.ExitCode))"
+}
+
 $smokeOut = Join-Path $buildPath "smoke.out.log"
 $smokeErr = Join-Path $buildPath "smoke.err.log"
 $proc = Start-Process -FilePath (Join-Path $distPath "Concord.exe") -PassThru `
