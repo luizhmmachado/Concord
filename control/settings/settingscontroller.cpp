@@ -2,10 +2,12 @@
 
 #include <QSettings>
 
+#include <QDebug>
 SettingsController::SettingsController(SupabaseClient *client, QObject *parent)
     : QObject(parent)
     , m_client(client)
 {
+    qInfo().noquote() << "SettingsController::SettingsController" << "client=" << client;
     connect(m_client, &SupabaseClient::selectFinished, this, [this](const QString &tag, bool ok, const QJsonArray &rows, const QString &) {
         if (tag != "settings:load" || !ok || rows.isEmpty())
             return;
@@ -30,6 +32,7 @@ SettingsController::SettingsController(SupabaseClient *client, QObject *parent)
 
 void SettingsController::loadFromLocalStorage()
 {
+    qInfo().noquote() << "SettingsController::loadFromLocalStorage";
     QSettings settings;
     settings.beginGroup("settings");
     m_theme = settings.value("theme", m_theme).toString();
@@ -43,6 +46,7 @@ void SettingsController::loadFromLocalStorage()
 
 void SettingsController::syncFromRemote()
 {
+    qInfo().noquote() << "SettingsController::syncFromRemote";
     if (!m_client->isAuthenticated())
         return;
     m_client->select(QStringLiteral("user_settings?user_id=eq.%1&select=*").arg(m_client->currentUserId()), "settings:load");
@@ -50,6 +54,7 @@ void SettingsController::syncFromRemote()
 
 void SettingsController::persistLocal()
 {
+    qInfo().noquote() << "SettingsController::persistLocal";
     QSettings settings;
     settings.beginGroup("settings");
     settings.setValue("theme", m_theme);
@@ -63,6 +68,7 @@ void SettingsController::persistLocal()
 
 void SettingsController::persistRemote()
 {
+    qInfo().noquote() << "SettingsController::persistRemote";
     if (!m_client->isAuthenticated())
         return;
     m_client->update(QStringLiteral("user_settings?user_id=eq.%1").arg(m_client->currentUserId()),
@@ -79,6 +85,7 @@ void SettingsController::persistRemote()
 
 void SettingsController::setTheme(const QString &theme)
 {
+    qInfo().noquote() << "SettingsController::setTheme" << "theme=" << theme;
     if (m_theme == theme)
         return;
     m_theme = theme;
@@ -89,6 +96,7 @@ void SettingsController::setTheme(const QString &theme)
 
 void SettingsController::setAccentColor(const QString &color)
 {
+    qInfo().noquote() << "SettingsController::setAccentColor" << "color=" << color;
     if (m_accentColor == color)
         return;
     m_accentColor = color;
@@ -99,6 +107,7 @@ void SettingsController::setAccentColor(const QString &color)
 
 void SettingsController::setNotificationsEnabled(bool enabled)
 {
+    qInfo().noquote() << "SettingsController::setNotificationsEnabled" << "enabled=" << enabled;
     if (m_notificationsEnabled == enabled)
         return;
     m_notificationsEnabled = enabled;
@@ -109,6 +118,7 @@ void SettingsController::setNotificationsEnabled(bool enabled)
 
 void SettingsController::setInputDevice(const QString &device)
 {
+    qInfo().noquote() << "SettingsController::setInputDevice" << "device=" << device;
     if (m_inputDevice == device)
         return;
     m_inputDevice = device;
@@ -119,6 +129,7 @@ void SettingsController::setInputDevice(const QString &device)
 
 void SettingsController::setOutputDevice(const QString &device)
 {
+    qInfo().noquote() << "SettingsController::setOutputDevice" << "device=" << device;
     if (m_outputDevice == device)
         return;
     m_outputDevice = device;
@@ -129,6 +140,7 @@ void SettingsController::setOutputDevice(const QString &device)
 
 void SettingsController::setVideoDevice(const QString &device)
 {
+    qInfo().noquote() << "SettingsController::setVideoDevice" << "device=" << device;
     if (m_videoDevice == device)
         return;
     m_videoDevice = device;

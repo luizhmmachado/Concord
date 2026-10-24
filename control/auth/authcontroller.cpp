@@ -4,6 +4,7 @@
 #include <QCoreApplication>
 #include <QJsonDocument>
 
+#include <QDebug>
 namespace {
 
 // GoTrue answers with a raw JSON body; never show that to the user.
@@ -45,6 +46,7 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
     : QObject(parent)
     , m_client(client)
 {
+    qInfo().noquote() << "AuthController::AuthController" << "client=" << client;
     connect(m_client, &SupabaseClient::signUpFinished, this, [this](bool ok, const QJsonObject &data, const QString &error) {
         setBusy(false);
         if (!ok) {
@@ -158,6 +160,7 @@ AuthController::AuthController(SupabaseClient *client, QObject *parent)
 
 void AuthController::setBusy(bool busy)
 {
+    qInfo().noquote() << "AuthController::setBusy" << "busy=" << busy;
     if (m_busy == busy)
         return;
     m_busy = busy;
@@ -166,12 +169,14 @@ void AuthController::setBusy(bool busy)
 
 void AuthController::setLastError(const QString &error)
 {
+    qInfo().noquote() << "AuthController::setLastError" << "error=" << error;
     m_lastError = error;
     emit lastErrorChanged();
 }
 
 void AuthController::signUp(const QString &email, const QString &password, const QString &username, const QString &displayName)
 {
+    qInfo().noquote() << "AuthController::signUp" << "email=" << email << "username=" << username << "displayName=" << displayName;
     setBusy(true);
     setLastError(QString());
     m_pendingConfirmationEmail = email;
@@ -182,6 +187,7 @@ void AuthController::signUp(const QString &email, const QString &password, const
 
 void AuthController::signIn(const QString &identifier, const QString &password)
 {
+    qInfo().noquote() << "AuthController::signIn" << "identifier=" << identifier;
     setBusy(true);
     setLastError(QString());
     m_pendingPassword = password;
@@ -197,6 +203,7 @@ void AuthController::signIn(const QString &identifier, const QString &password)
 
 void AuthController::resendConfirmationEmail()
 {
+    qInfo().noquote() << "AuthController::resendConfirmationEmail";
     if (m_pendingConfirmationEmail.isEmpty())
         return;
     m_client->resendConfirmationEmail(m_pendingConfirmationEmail);
@@ -204,12 +211,14 @@ void AuthController::resendConfirmationEmail()
 
 void AuthController::signOut()
 {
+    qInfo().noquote() << "AuthController::signOut";
     setBusy(true);
     m_client->signOut();
 }
 
 void AuthController::confirmSignIn()
 {
+    qInfo().noquote() << "AuthController::confirmSignIn";
     if (m_pendingConfirmationEmail.isEmpty() || m_pendingPassword.isEmpty()) {
         setLastError(QStringLiteral("Sessão expirada. Entre novamente com seu e-mail e senha."));
         return;
@@ -222,6 +231,7 @@ void AuthController::confirmSignIn()
 
 void AuthController::tryRestoreSession()
 {
+    qInfo().noquote() << "AuthController::tryRestoreSession";
     QSettings settings;
     const QString refreshToken = settings.value("auth/refreshToken").toString();
     const QString userId = settings.value("auth/userId").toString();
@@ -235,6 +245,7 @@ void AuthController::tryRestoreSession()
 
 void AuthController::fetchProfile()
 {
+    qInfo().noquote() << "AuthController::fetchProfile";
     // SupabaseClient::selectFinished is shared across the whole app; use a
     // fixed tag so we only react to our own profile query's reply.
     m_profileRequestId = QStringLiteral("auth-profile");

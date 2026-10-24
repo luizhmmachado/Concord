@@ -1,12 +1,15 @@
 #include "serverlistmodel.h"
 
+#include <QDebug>
 ServerListModel::ServerListModel(QObject *parent)
     : QAbstractListModel(parent)
 {
+    qInfo().noquote() << "ServerListModel::ServerListModel";
 }
 
 int ServerListModel::rowCount(const QModelIndex &parent) const
 {
+    qInfo().noquote() << "ServerListModel::rowCount";
     if (parent.isValid())
         return 0;
     return m_servers.size();
@@ -14,6 +17,7 @@ int ServerListModel::rowCount(const QModelIndex &parent) const
 
 QVariant ServerListModel::data(const QModelIndex &index, int role) const
 {
+    qInfo().noquote() << "ServerListModel::data" << "index=" << index << "role=" << role;
     if (!index.isValid() || index.row() >= m_servers.size())
         return {};
 
@@ -30,6 +34,7 @@ QVariant ServerListModel::data(const QModelIndex &index, int role) const
 
 QHash<int, QByteArray> ServerListModel::roleNames() const
 {
+    qInfo().noquote() << "ServerListModel::roleNames";
     return {
         {IdRole, "serverId"},
         {NameRole, "name"},
@@ -41,6 +46,7 @@ QHash<int, QByteArray> ServerListModel::roleNames() const
 
 void ServerListModel::setServers(const QJsonArray &rows)
 {
+    qInfo().noquote() << "ServerListModel::setServers" << "rows=" << rows;
     beginResetModel();
     m_servers.clear();
     for (const QJsonValue &value : rows) {
@@ -58,6 +64,7 @@ void ServerListModel::setServers(const QJsonArray &rows)
 
 void ServerListModel::upsertServer(const QJsonObject &row)
 {
+    qInfo().noquote() << "ServerListModel::upsertServer" << "row=" << row;
     const QString id = row.value("id").toString();
     for (int i = 0; i < m_servers.size(); ++i) {
         if (m_servers.at(i).id == id) {
@@ -80,6 +87,7 @@ void ServerListModel::upsertServer(const QJsonObject &row)
 
 QString ServerListModel::serverIdAt(int row) const
 {
+    qInfo().noquote() << "ServerListModel::serverIdAt" << "row=" << row;
     if (row < 0 || row >= m_servers.size())
         return {};
     return m_servers.at(row).id;

@@ -2,13 +2,16 @@
 
 #include <algorithm>
 
+#include <QDebug>
 ChannelListModel::ChannelListModel(QObject *parent)
     : QAbstractListModel(parent)
 {
+    qInfo().noquote() << "ChannelListModel::ChannelListModel";
 }
 
 int ChannelListModel::rowCount(const QModelIndex &parent) const
 {
+    qInfo().noquote() << "ChannelListModel::rowCount";
     if (parent.isValid())
         return 0;
     return m_channels.size();
@@ -16,6 +19,7 @@ int ChannelListModel::rowCount(const QModelIndex &parent) const
 
 QVariant ChannelListModel::data(const QModelIndex &index, int role) const
 {
+    qInfo().noquote() << "ChannelListModel::data" << "index=" << index << "role=" << role;
     if (!index.isValid() || index.row() >= m_channels.size())
         return {};
 
@@ -32,6 +36,7 @@ QVariant ChannelListModel::data(const QModelIndex &index, int role) const
 
 QHash<int, QByteArray> ChannelListModel::roleNames() const
 {
+    qInfo().noquote() << "ChannelListModel::roleNames";
     return {
         {IdRole, "channelId"},
         {ServerIdRole, "serverId"},
@@ -43,6 +48,7 @@ QHash<int, QByteArray> ChannelListModel::roleNames() const
 
 void ChannelListModel::setChannels(const QJsonArray &rows)
 {
+    qInfo().noquote() << "ChannelListModel::setChannels" << "rows=" << rows;
     beginResetModel();
     m_channels.clear();
     for (const QJsonValue &value : rows) {
@@ -63,6 +69,7 @@ void ChannelListModel::setChannels(const QJsonArray &rows)
 
 void ChannelListModel::addChannel(const QJsonObject &row)
 {
+    qInfo().noquote() << "ChannelListModel::addChannel" << "row=" << row;
     beginInsertRows(QModelIndex(), m_channels.size(), m_channels.size());
     m_channels.append(ChannelEntry{
         row.value("id").toString(),
@@ -76,6 +83,7 @@ void ChannelListModel::addChannel(const QJsonObject &row)
 
 QString ChannelListModel::channelIdAt(int row) const
 {
+    qInfo().noquote() << "ChannelListModel::channelIdAt" << "row=" << row;
     if (row < 0 || row >= m_channels.size())
         return {};
     return m_channels.at(row).id;
@@ -83,6 +91,7 @@ QString ChannelListModel::channelIdAt(int row) const
 
 QString ChannelListModel::channelTypeAt(int row) const
 {
+    qInfo().noquote() << "ChannelListModel::channelTypeAt" << "row=" << row;
     if (row < 0 || row >= m_channels.size())
         return {};
     return m_channels.at(row).type;
