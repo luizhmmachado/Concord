@@ -29,6 +29,6 @@ Rectangle {
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onClicked: Qt.openUrlExternally(root.imageSource)
+        onClicked: imageController.openImage(root.imageSource)
     }
 }

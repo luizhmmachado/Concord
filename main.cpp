@@ -13,6 +13,7 @@
 #include "control/database/supabaseclient.h"
 #include "control/database/realtimeclient.h"
 #include "control/clipboard/clipboardcontroller.h"
+#include "control/images/imagecontroller.h"
 #include "control/auth/authcontroller.h"
 #include "control/servers/servercontroller.h"
 #include "control/servers/servermemberscontroller.h"
@@ -102,6 +103,7 @@ int main(int argc, char *argv[])
     SupabaseClient supabaseClient;
     supabaseClient.configure(kSupabaseUrl, kSupabaseAnonKey);
     ClipboardController clipboardController;
+    ImageController imageController;
 
     RealtimeClient realtimeClient;
 
@@ -119,6 +121,7 @@ int main(int argc, char *argv[])
 
     QObject::connect(&authController, &AuthController::authenticatedChanged, [&]() {
         if (!authController.isAuthenticated()) {
+            imageController.closeImage();
             onlinePresenceController.clear();
             return;
         }
@@ -180,6 +183,7 @@ int main(int argc, char *argv[])
     ctx->setContextProperty("screenCaptureSupported", !isWaylandSession());
     ctx->setContextProperty("supabaseClient", &supabaseClient);
     ctx->setContextProperty("clipboardController", &clipboardController);
+    ctx->setContextProperty("imageController", &imageController);
     ctx->setContextProperty("realtimeClient", &realtimeClient);
     ctx->setContextProperty("authController", &authController);
     ctx->setContextProperty("serverController", &serverController);

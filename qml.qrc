@@ -21,6 +21,7 @@
         <file>ui/Components/Avatar.qml</file>
         <file>ui/Components/ComponentPopup.qml</file>
         <file>ui/Components/ImagePickerDialog.qml</file>
+        <file>ui/Components/ImageViewer.qml</file>
         <file>ui/Components/MemberListItem.qml</file>
         <file>ui/Components/MessageImage.qml</file>
     </qresource>

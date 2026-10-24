@@ -146,6 +146,14 @@ Rectangle {
         SettingsPage { onCloseRequested: root.showSettings = false }
     }
 
+    ImageViewer {
+        anchors.fill: parent
+        z: 30
+        visible: imageController.viewerUrl.length > 0
+        imageSource: imageController.viewerUrl
+        onCloseRequested: imageController.closeImage()
+    }
+
     ComponentPopup {
         id: createServerDialog
         title: "Servidores"
