@@ -53,6 +53,13 @@ Copy-Item $exe.FullName (Join-Path $distPath "Concord.exe") -Force
 & windeployqt --release --no-translations --compiler-runtime --qmldir $root --dir $distPath $exe.FullName
 if ($LASTEXITCODE -ne 0) { throw "windeployqt failed" }
 
+# Qt.labs.platform's native file dialogs depend on QtWidgets at runtime.
+$qtBin = Split-Path ((Get-Command qmake).Source) -Parent
+$widgetsDll = Join-Path $qtBin "Qt5Widgets.dll"
+if (Test-Path $widgetsDll) {
+    Copy-Item $widgetsDll $distPath -Force
+}
+
 # windeployqt only deploys the platform plugin matching the local session, but
 # the smoke test runs with QT_QPA_PLATFORM=offscreen on a headless runner.
 $qtPlugins = (& qmake -query QT_INSTALL_PLUGINS).Trim()

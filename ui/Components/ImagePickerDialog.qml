@@ -1,15 +1,14 @@
 import QtQuick 2.15
-import QtQuick.Dialogs 1.3
+import Qt.labs.platform 1.1
 
 FileDialog {
     id: root
     title: "Selecionar imagem"
     modality: Qt.ApplicationModal
-    selectExisting: true
-    selectMultiple: false
+    fileMode: FileDialog.OpenFile
     nameFilters: ["Imagens (*.png *.jpg *.jpeg *.gif *.webp *.bmp)", "Todos os arquivos (*)"]
 
     signal imageSelected(url selectedUrl)
 
-    onAccepted: root.imageSelected(root.fileUrl)
+    onAccepted: root.imageSelected(root.file)
 }
