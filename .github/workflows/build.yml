@@ -34,6 +34,9 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
+          # Ubuntu runner images ship LLVM's slotted libunwind, which conflicts
+          # with libunwind-dev required by GStreamer. Remove it before install.
+          sudo apt-get remove -y 'libunwind-*' || true
           sudo apt-get install -y --no-install-recommends \
             build-essential pkg-config dpkg-dev \
             qt5-qmake qtbase5-dev qtbase5-dev-tools qtdeclarative5-dev \
