@@ -3,35 +3,14 @@
 #include <QUuid>
 #include <QJsonDocument>
 #include <QDebug>
-#include <QEventLoop>
-#include <QTimer>
 
 CallController::CallController(SupabaseClient *client, RealtimeClient *realtime, QObject *parent)
     : QObject(parent)
     , m_client(client)
     , m_realtime(realtime)
 {
+    qInfo().noquote() << "CallController::CallController" << "client=" << client << "realtime=" << realtime;
     connect(&m_media, &CallMediaEngine::errorOccurred, this, &CallController::errorOccurred);
-
-    connect(m_client, &SupabaseClient::insertFinished, this, [this](const QString &tag, bool ok, const QJsonArray &rows, const QString &error) {
-        if (tag != "calls:create" || !ok || rows.isEmpty()) {
-            if (tag == "calls:create")
-                emit errorOccurred(error);
-            return;
-        }
-        m_callId = rows.first().toObject().value("id").toString();
-    });
-
-    connect(m_client, &SupabaseClient::rpcFinished, this, [this](const QString &tag, bool, const QJsonValue &, const QString &) {
-        if (tag == "calls:leaveChannel")
-            emit leaveAcknowledged();
-    });
-
-    m_heartbeat.setInterval(10000);
-    connect(&m_heartbeat, &QTimer::timeout, this, [this]() {
-        if (!m_callChannelId.isEmpty())
-            m_client->rpc("heartbeat_call_participant", QJsonObject{{"p_channel_id", m_callChannelId}}, "calls:heartbeat");
-    });
 
     connect(m_realtime, &RealtimeClient::topicJoined, this, [this](const QString &topic) {
         if (topic == m_signalingTopic)
@@ -90,29 +69,25 @@ CallController::CallController(SupabaseClient *client, RealtimeClient *realtime,
 
 CallController::~CallController()
 {
+    qInfo().noquote() << "CallController::~CallController";
     leaveCall();
 }
 
 void CallController::shutdown()
 {
+    qInfo().noquote() << "CallController::shutdown";
     if (!m_inCall)
         return;
 
+    // leaveCall() sends the signaling "leave" and the presence untrack; even
+    // if the frame is lost the realtime server removes the session as soon as
+    // the websocket closes.
     leaveCall();
-
-    // leaveCall() only queues the HTTP request; without pumping the loop here
-    // the process exits first and the participant row is left behind.
-    QEventLoop loop;
-    QTimer timeout;
-    timeout.setSingleShot(true);
-    connect(&timeout, &QTimer::timeout, &loop, &QEventLoop::quit);
-    connect(this, &CallController::leaveAcknowledged, &loop, &QEventLoop::quit);
-    timeout.start(2000);
-    loop.exec();
 }
 
 void CallController::joinSignalingTopic(const QString &topic)
 {
+    qInfo().noquote() << "CallController::joinSignalingTopic" << "topic=" << topic;
     m_signalingTopic = topic;
     m_announced = false;
     m_realtime->joinTopic(topic);
@@ -133,6 +108,7 @@ void CallController::joinSignalingTopic(const QString &topic)
 
 void CallController::announcePresence()
 {
+    qInfo().noquote() << "CallController::announcePresence";
     if (m_announced || m_signalingTopic.isEmpty())
         return;
     m_announced = true;
@@ -145,6 +121,7 @@ void CallController::announcePresence()
 
 void CallController::setLocalDisplayName(const QString &name)
 {
+    qInfo().noquote() << "CallController::setLocalDisplayName" << "name=" << name;
     if (m_localDisplayName == name)
         return;
     m_localDisplayName = name;
@@ -153,30 +130,31 @@ void CallController::setLocalDisplayName(const QString &name)
     emit localDisplayNameChanged();
 }
 
-void CallController::startChannelCall(const QString &channelId)
+void CallController::startChannelCall(const QString &channelId, const QString &serverId)
 {
+    qInfo().noquote() << "CallController::startChannelCall" << "channelId=" << channelId
+                      << "serverId=" << serverId;
     if (m_inCall)
         leaveCall();
     m_callChannelId = channelId;
+    m_callServerId = serverId;
     emit callChannelIdChanged();
     // Everyone in the same voice channel must land on the same signaling topic,
-    // so it is derived from the channel instead of a freshly inserted call row.
-    // Supabase Realtime requires the "realtime:" prefix; without it the join is
-    // rejected and no signaling is exchanged.
+    // so it is derived from the channel id. Supabase Realtime requires the
+    // "realtime:" prefix; without it the join is rejected.
     joinSignalingTopic(QStringLiteral("realtime:call:channel:%1").arg(channelId));
-    // Persisted so other members see the channel occupied without joining.
-    m_client->rpc("join_channel_call", QJsonObject{{"p_channel_id", channelId}}, "calls:joinChannel");
-    m_heartbeat.start();
+    // Occupancy is published through Realtime Presence by
+    // CallPresenceController, driven by callController's state signals.
 }
 
 void CallController::startPrivateCall(const QString &conversationId, const QString &peerUserId, const QString &peerDisplayName)
 {
+    qInfo().noquote() << "CallController::startPrivateCall" << "conversationId=" << conversationId << "peerUserId=" << peerUserId << "peerDisplayName=" << peerDisplayName;
     Q_UNUSED(peerUserId)
     Q_UNUSED(peerDisplayName)
     if (m_inCall)
         leaveCall();
     joinSignalingTopic(QStringLiteral("realtime:call:conversation:%1").arg(conversationId));
-    m_client->insert("calls", QJsonObject{{"conversation_id", conversationId}, {"initiator_id", m_client->currentUserId()}}, "calls:create");
 }
 
 WebRtcPeerConnection *CallController::ensurePeer(const QString &peerId, const QString &displayName, bool polite)
@@ -198,6 +176,7 @@ WebRtcPeerConnection *CallController::ensurePeer(const QString &peerId, const QS
 
 void CallController::addPeer(const QString &peerId, const QString &displayName, bool polite)
 {
+    qInfo().noquote() << "CallController::addPeer" << "peerId=" << peerId << "displayName=" << displayName << "polite=" << polite;
     if (m_peers.find(peerId) != m_peers.end())
         return;
 
@@ -235,6 +214,7 @@ void CallController::addPeer(const QString &peerId, const QString &displayName, 
 
 void CallController::removeAllPeers()
 {
+    qInfo().noquote() << "CallController::removeAllPeers";
     // Disconnect the signal handlers before the engine frees each webrtcbin.
     for (auto &entry : m_peers)
         entry.second->stop();
@@ -246,6 +226,7 @@ void CallController::removeAllPeers()
 
 void CallController::leaveCall()
 {
+    qInfo().noquote() << "CallController::leaveCall";
     if (!m_inCall)
         return;
 
@@ -253,10 +234,6 @@ void CallController::leaveCall()
         m_realtime->broadcast(m_signalingTopic, "leave", QJsonObject{{"from", m_client->currentUserId()}});
         m_realtime->leaveTopic(m_signalingTopic);
     }
-
-    if (!m_callChannelId.isEmpty())
-        m_client->rpc("leave_channel_call", QJsonObject{{"p_channel_id", m_callChannelId}}, "calls:leaveChannel");
-    m_heartbeat.stop();
 
     removeAllPeers();
     m_participants.clear();
@@ -268,8 +245,8 @@ void CallController::leaveCall()
     updateActiveScreen();
     m_localParticipantId.clear();
     m_signalingTopic.clear();
-    m_callId.clear();
     m_callChannelId.clear();
+    m_callServerId.clear();
     emit callChannelIdChanged();
     m_inCall = false;
     emit inCallChanged();
@@ -288,6 +265,7 @@ QObject *CallController::activeScreenSource()
 
 void CallController::updateActiveScreen()
 {
+    qInfo().noquote() << "CallController::updateActiveScreen";
     QString owner;
     if (m_screenSharing) {
         owner = m_localParticipantId;
@@ -308,26 +286,19 @@ void CallController::updateActiveScreen()
 
 void CallController::applyLocalStateToAllPeers()
 {
+    qInfo().noquote() << "CallController::applyLocalStateToAllPeers";
     m_media.setMicMuted(m_micMuted);
     m_media.setCameraEnabled(m_cameraEnabled);
     m_media.setScreenSharingEnabled(m_screenSharing);
     updateLocalParticipantState();
     updateActiveScreen();
-
-    // Mirrored to the DB so the channel list shows the right icons to members
-    // who are not in the call.
-    if (!m_callChannelId.isEmpty()) {
-        m_client->rpc("set_call_state",
-                      QJsonObject{{"p_channel_id", m_callChannelId},
-                                  {"p_muted", m_micMuted},
-                                  {"p_camera_on", m_cameraEnabled},
-                                  {"p_screen_sharing", m_screenSharing}},
-                      "calls:state");
-    }
+    // CallPresenceController mirrors these flags to the server presence topic
+    // through the signals emitted by the toggle methods.
 }
 
 void CallController::updateLocalParticipantState()
 {
+    qInfo().noquote() << "CallController::updateLocalParticipantState";
     if (m_localParticipantId.isEmpty())
         return;
     m_participants.setMuted(m_localParticipantId, m_micMuted);
@@ -337,6 +308,7 @@ void CallController::updateLocalParticipantState()
 
 void CallController::broadcastLocalState()
 {
+    qInfo().noquote() << "CallController::broadcastLocalState";
     if (m_signalingTopic.isEmpty())
         return;
     m_realtime->broadcast(m_signalingTopic, "state",
@@ -349,6 +321,7 @@ void CallController::broadcastLocalState()
 
 void CallController::toggleMicMuted()
 {
+    qInfo().noquote() << "CallController::toggleMicMuted";
     m_micMuted = !m_micMuted;
     applyLocalStateToAllPeers();
     broadcastLocalState();
@@ -357,6 +330,7 @@ void CallController::toggleMicMuted()
 
 void CallController::toggleCamera()
 {
+    qInfo().noquote() << "CallController::toggleCamera";
     m_cameraEnabled = !m_cameraEnabled;
     applyLocalStateToAllPeers();
     broadcastLocalState();
@@ -365,6 +339,7 @@ void CallController::toggleCamera()
 
 void CallController::toggleScreenShare()
 {
+    qInfo().noquote() << "CallController::toggleScreenShare";
     if (m_screenSharing)
         stopScreenShare();
     else
@@ -373,6 +348,7 @@ void CallController::toggleScreenShare()
 
 void CallController::startScreenShare(int sourceIndex)
 {
+    qInfo().noquote() << "CallController::startScreenShare" << "sourceIndex=" << sourceIndex;
     if (!m_screenShareSources.isValidIndex(sourceIndex)) {
         emit errorOccurred(QStringLiteral("Fonte de compartilhamento inválida"));
         return;
@@ -401,6 +377,7 @@ void CallController::startScreenShare(int sourceIndex)
 
 void CallController::stopScreenShare()
 {
+    qInfo().noquote() << "CallController::stopScreenShare";
     if (!m_screenSharing)
         return;
     m_screenSharing = false;

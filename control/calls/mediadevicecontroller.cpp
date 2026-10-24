@@ -1,15 +1,20 @@
 #include "mediadevicecontroller.h"
 
+#include <QDebug>
 MediaDeviceController::MediaDeviceController(QObject *parent)
     : QObject(parent)
 {
+    qInfo().noquote() << "MediaDeviceController::MediaDeviceController";
     refresh();
 }
 
-MediaDeviceController::~MediaDeviceController() = default;
+MediaDeviceController::~MediaDeviceController() {
+    qInfo().noquote() << "MediaDeviceController::~MediaDeviceController";
+}
 
 void MediaDeviceController::refresh()
 {
+    qInfo().noquote() << "MediaDeviceController::refresh";
     m_microphones.clear();
     m_speakers.clear();
     m_cameras.clear();

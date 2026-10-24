@@ -9,6 +9,7 @@ CallMediaEngine::CallMediaEngine(QObject *parent)
     , m_cameraPreview(new VideoStreamSource(this))
     , m_screenPreview(new VideoStreamSource(this))
 {
+    qInfo().noquote() << "CallMediaEngine::CallMediaEngine";
     m_cameraPreview->setObjectName(QStringLiteral("cameraPreview"));
     m_screenPreview->setObjectName(QStringLiteral("screenPreview"));
 }
@@ -65,16 +66,19 @@ GstBusSyncReply busHandler(GstBus *, GstMessage *message, gpointer userData)
 
 CallMediaEngine::~CallMediaEngine()
 {
+    qInfo().noquote() << "CallMediaEngine::~CallMediaEngine";
     stop();
 }
 
 bool CallMediaEngine::isRunning() const
 {
+    qInfo().noquote() << "CallMediaEngine::isRunning";
     return m_pipeline != nullptr;
 }
 
 bool CallMediaEngine::start()
 {
+    qInfo().noquote() << "CallMediaEngine::start";
     if (m_pipeline)
         return true;
 
@@ -152,6 +156,7 @@ bool CallMediaEngine::start()
 
 void CallMediaEngine::stop()
 {
+    qInfo().noquote() << "CallMediaEngine::stop";
     if (!m_pipeline)
         return;
 
@@ -191,6 +196,7 @@ void CallMediaEngine::stop()
 
 void CallMediaEngine::selectPad(GstElement *selector, GstPad *pad)
 {
+    qInfo().noquote() << "CallMediaEngine::selectPad" << "selector=" << selector << "pad=" << pad;
     if (selector && pad)
         g_object_set(selector, "active-pad", pad, nullptr);
 }
@@ -244,6 +250,7 @@ GstElement *CallMediaEngine::addLiveSource(const QString &description, GstElemen
 
 void CallMediaEngine::removeLiveSource(GstElement **source, GstElement *selector, GstPad **pad)
 {
+    qInfo().noquote() << "CallMediaEngine::removeLiveSource" << "source=" << source << "selector=" << selector << "pad=" << pad;
     if (!*source)
         return;
 
@@ -263,6 +270,7 @@ void CallMediaEngine::removeLiveSource(GstElement **source, GstElement *selector
 
 void CallMediaEngine::setCameraEnabled(bool enabled)
 {
+    qInfo().noquote() << "CallMediaEngine::setCameraEnabled" << "enabled=" << enabled;
     m_cameraEnabled = enabled;
     qInfo() << "[media] setCameraEnabled" << enabled << "pipeline" << (m_pipeline != nullptr);
     if (!m_pipeline)
@@ -284,6 +292,7 @@ void CallMediaEngine::setCameraEnabled(bool enabled)
 
 void CallMediaEngine::setScreenSharingEnabled(bool enabled)
 {
+    qInfo().noquote() << "CallMediaEngine::setScreenSharingEnabled" << "enabled=" << enabled;
     m_screenSharing = enabled;
     qInfo() << "[media] setScreenSharingEnabled" << enabled << "pipeline" << (m_pipeline != nullptr);
     if (!m_pipeline)
@@ -309,6 +318,7 @@ void CallMediaEngine::setScreenSharingEnabled(bool enabled)
 
 void CallMediaEngine::setMicMuted(bool muted)
 {
+    qInfo().noquote() << "CallMediaEngine::setMicMuted" << "muted=" << muted;
     m_micMuted = muted;
     if (m_micVolume)
         g_object_set(m_micVolume, "mute", muted ? TRUE : FALSE, nullptr);
@@ -316,10 +326,12 @@ void CallMediaEngine::setMicMuted(bool muted)
 
 void CallMediaEngine::setScreenCaptureDescription(const QString &description)
 {
+    qInfo().noquote() << "CallMediaEngine::setScreenCaptureDescription" << "description=" << description;
     m_screenCaptureDescription = description;
 }
 GstElement *CallMediaEngine::attachBranch(GstElement *tee, const QString &description, PeerBranches &peer)
 {
+    qInfo().noquote() << "CallMediaEngine::attachBranch" << "description=" << description;
     if (!tee) {
         qWarning() << "[media] attachBranch: tee inexistente para" << description.left(40);
         return nullptr;
@@ -376,6 +388,7 @@ GstElement *CallMediaEngine::attachBranch(GstElement *tee, const QString &descri
 
 GstElement *CallMediaEngine::createPeerBin(const QString &peerId)
 {
+    qInfo().noquote() << "CallMediaEngine::createPeerBin" << "peerId=" << peerId;
     if (!m_pipeline || m_peers.count(peerId))
         return nullptr;
 
@@ -423,6 +436,7 @@ GstElement *CallMediaEngine::createPeerBin(const QString &peerId)
 
 void CallMediaEngine::startPeerBin(const QString &peerId)
 {
+    qInfo().noquote() << "CallMediaEngine::startPeerBin" << "peerId=" << peerId;
     auto it = m_peers.find(peerId);
     if (it == m_peers.end())
         return;
@@ -436,6 +450,7 @@ void CallMediaEngine::startPeerBin(const QString &peerId)
 }
 void CallMediaEngine::removePeerBin(const QString &peerId)
 {
+    qInfo().noquote() << "CallMediaEngine::removePeerBin" << "peerId=" << peerId;
     auto it = m_peers.find(peerId);
     if (it == m_peers.end())
         return;
@@ -460,38 +475,64 @@ void CallMediaEngine::removePeerBin(const QString &peerId)
 
 #else // !CONCORD_HAS_GSTREAMER
 
-CallMediaEngine::~CallMediaEngine() = default;
+CallMediaEngine::~CallMediaEngine() {
+    qInfo().noquote() << "CallMediaEngine::~CallMediaEngine";
+}
 
 bool CallMediaEngine::start()
 {
+    qInfo().noquote() << "CallMediaEngine::start";
     emit errorOccurred(QStringLiteral("Compilado sem GStreamer: chamadas com áudio/vídeo desabilitadas."));
     return false;
 }
 
-void CallMediaEngine::stop() {}
-bool CallMediaEngine::isRunning() const { return false; }
-void CallMediaEngine::setCameraEnabled(bool enabled) { m_cameraEnabled = enabled; }
-void CallMediaEngine::setScreenSharingEnabled(bool enabled) { m_screenSharing = enabled; }
-void CallMediaEngine::setMicMuted(bool muted) { m_micMuted = muted; }
+void CallMediaEngine::stop()
+{
+    qInfo().noquote() << "CallMediaEngine::stop";
+}
+bool CallMediaEngine::isRunning() const
+{
+    qInfo().noquote() << "CallMediaEngine::isRunning";
+    return false;
+}
+void CallMediaEngine::setCameraEnabled(bool enabled)
+{
+    qInfo().noquote() << "CallMediaEngine::setCameraEnabled" << "enabled=" << enabled;
+    m_cameraEnabled = enabled;
+}
+void CallMediaEngine::setScreenSharingEnabled(bool enabled)
+{
+    qInfo().noquote() << "CallMediaEngine::setScreenSharingEnabled" << "enabled=" << enabled;
+    m_screenSharing = enabled;
+}
+void CallMediaEngine::setMicMuted(bool muted)
+{
+    qInfo().noquote() << "CallMediaEngine::setMicMuted" << "muted=" << muted;
+    m_micMuted = muted;
+}
 
 void CallMediaEngine::setScreenCaptureDescription(const QString &description)
 {
+    qInfo().noquote() << "CallMediaEngine::setScreenCaptureDescription" << "description=" << description;
     m_screenCaptureDescription = description;
 }
 
 void *CallMediaEngine::createPeerBin(const QString &peerId)
 {
+    qInfo().noquote() << "CallMediaEngine::createPeerBin" << "peerId=" << peerId;
     Q_UNUSED(peerId)
     return nullptr;
 }
 
 void CallMediaEngine::startPeerBin(const QString &peerId)
 {
+    qInfo().noquote() << "CallMediaEngine::startPeerBin" << "peerId=" << peerId;
     Q_UNUSED(peerId)
 }
 
 void CallMediaEngine::removePeerBin(const QString &peerId)
 {
+    qInfo().noquote() << "CallMediaEngine::removePeerBin" << "peerId=" << peerId;
     Q_UNUSED(peerId)
 }
 

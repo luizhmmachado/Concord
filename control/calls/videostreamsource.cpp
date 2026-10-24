@@ -14,15 +14,18 @@
 VideoStreamSource::VideoStreamSource(QObject *parent)
     : QObject(parent)
 {
+    qInfo().noquote() << "VideoStreamSource::VideoStreamSource";
 }
 
 VideoStreamSource::~VideoStreamSource()
 {
+    qInfo().noquote() << "VideoStreamSource::~VideoStreamSource";
     stopSurface();
 }
 
 void VideoStreamSource::setVideoSurface(QAbstractVideoSurface *surface)
 {
+    qInfo().noquote() << "VideoStreamSource::setVideoSurface" << "surface=" << surface;
     qInfo() << "[video]" << objectName() << "setVideoSurface" << surface;
     if (m_surface == surface)
         return;
@@ -33,12 +36,14 @@ void VideoStreamSource::setVideoSurface(QAbstractVideoSurface *surface)
 
 void VideoStreamSource::stopSurface()
 {
+    qInfo().noquote() << "VideoStreamSource::stopSurface";
     if (m_surface && m_surface->isActive())
         m_surface->stop();
 }
 
 void VideoStreamSource::clear()
 {
+    qInfo().noquote() << "VideoStreamSource::clear";
     stopSurface();
     m_currentSize = QSize();
     emit frameSizeChanged();
@@ -50,11 +55,13 @@ void VideoStreamSource::clear()
 
 void VideoStreamSource::pushFrame(const QImage &image)
 {
+    qInfo().noquote() << "VideoStreamSource::pushFrame" << "image=" << image;
     QMetaObject::invokeMethod(this, "renderFrame", Qt::QueuedConnection, Q_ARG(QImage, image));
 }
 
 void VideoStreamSource::noteSample(int width, int height)
 {
+    qInfo().noquote() << "VideoStreamSource::noteSample" << "width=" << width << "height=" << height;
     if (m_loggedFirstSample)
         return;
     m_loggedFirstSample = true;
@@ -63,6 +70,7 @@ void VideoStreamSource::noteSample(int width, int height)
 
 void VideoStreamSource::renderFrame(const QImage &image)
 {
+    qInfo().noquote() << "VideoStreamSource::renderFrame" << "image=" << image;
     if (!m_surface) {
         if (!m_warnedNoSurface) {
             m_warnedNoSurface = true;

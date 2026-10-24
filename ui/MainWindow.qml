@@ -85,7 +85,7 @@ Rectangle {
             if (type === "text") {
                 chatController.openChannel(channelId)
             } else {
-                callController.startChannelCall(channelId)
+                callController.startChannelCall(channelId, serverController.currentServerId)
             }
         }
     }

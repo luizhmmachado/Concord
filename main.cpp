@@ -138,6 +138,35 @@ int main(int argc, char *argv[])
             onlinePresenceController.setLocalUser(authController.userId(), name);
     });
 
+    // Voice-channel occupancy is ephemeral (Realtime Presence), like Discord's
+    // gateway voice states: publish our own membership/state whenever it
+    // changes and let the presence controller fan it out to server members.
+    const auto syncLocalPresence = [&]() {
+        if (callController.inCall() && !callController.callChannelId().isEmpty()) {
+            callPresenceController.setLocalCallState(
+                callController.callServerId(),
+                callController.callChannelId(),
+                callController.localDisplayName(),
+                callController.micMuted(),
+                callController.cameraEnabled(),
+                callController.screenSharing());
+        } else {
+            callPresenceController.clearLocalCallState();
+        }
+    };
+    QObject::connect(&callController, &CallController::inCallChanged,
+                     &callPresenceController, syncLocalPresence);
+    QObject::connect(&callController, &CallController::callChannelIdChanged,
+                     &callPresenceController, syncLocalPresence);
+    QObject::connect(&callController, &CallController::micMutedChanged,
+                     &callPresenceController, syncLocalPresence);
+    QObject::connect(&callController, &CallController::cameraEnabledChanged,
+                     &callPresenceController, syncLocalPresence);
+    QObject::connect(&callController, &CallController::screenSharingChanged,
+                     &callPresenceController, syncLocalPresence);
+    QObject::connect(&callController, &CallController::localDisplayNameChanged,
+                     &callPresenceController, syncLocalPresence);
+
     QObject::connect(&app, &QGuiApplication::aboutToQuit, [&]() {
         callController.shutdown();
     });

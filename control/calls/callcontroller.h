@@ -3,7 +3,6 @@
 
 #include <QObject>
 #include <QHash>
-#include <QTimer>
 #include <map>
 #include <memory>
 #include "control/database/supabaseclient.h"
@@ -43,6 +42,8 @@ public:
     bool cameraEnabled() const { return m_cameraEnabled; }
     bool screenSharing() const { return m_screenSharing; }
     QString callChannelId() const { return m_callChannelId; }
+    // Server that owns the voice channel; used to publish ephemeral presence.
+    QString callServerId() const { return m_callServerId; }
     CallParticipantModel *participants() { return &m_participants; }
     QObject *screenSource() { return m_media.screenPreview(); }
     QObject *activeScreenSource();
@@ -54,11 +55,11 @@ public:
     void setLocalDisplayName(const QString &name);
 
     // Starts (or joins) a call scoped to a voice channel or a private DM.
-    Q_INVOKABLE void startChannelCall(const QString &channelId);
+    // `serverId` is only needed for channel calls (presence is per server).
+    Q_INVOKABLE void startChannelCall(const QString &channelId, const QString &serverId = QString());
     Q_INVOKABLE void startPrivateCall(const QString &conversationId, const QString &peerUserId, const QString &peerDisplayName);
     Q_INVOKABLE void leaveCall();
-    // Leaves and blocks briefly so the request reaches the server before the
-    // event loop stops; call this from aboutToQuit.
+    // Leaves the signaling room/presence before the event loop stops.
     void shutdown();
 
     Q_INVOKABLE void toggleMicMuted();
@@ -76,7 +77,6 @@ signals:
     void callChannelIdChanged();
     void localDisplayNameChanged();
     void activeScreenChanged();
-    void leaveAcknowledged();
     void errorOccurred(const QString &message);
 
 private:
@@ -99,8 +99,8 @@ private:
     ScreenShareSourceModel m_screenShareSources;
     std::map<QString, std::unique_ptr<WebRtcPeerConnection>> m_peers;
 
-    QString m_callId;
     QString m_callChannelId;
+    QString m_callServerId;
     QString m_signalingTopic;
     bool m_inCall = false;
     bool m_announced = false;
@@ -111,9 +111,6 @@ private:
     QString m_localDisplayName;
     QString m_activeScreenOwner;
     QHash<QString, QString> m_knownNames;
-    // Keeps our call_participants row fresh so other clients can tell a crashed
-    // session from an active one.
-    QTimer m_heartbeat;
 };
 
 #endif // CALLCONTROLLER_H

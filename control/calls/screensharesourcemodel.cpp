@@ -12,11 +12,13 @@
 ScreenShareSourceModel::ScreenShareSourceModel(QObject *parent)
     : QAbstractListModel(parent)
 {
+    qInfo().noquote() << "ScreenShareSourceModel::ScreenShareSourceModel";
     refresh();
 }
 
 int ScreenShareSourceModel::rowCount(const QModelIndex &parent) const
 {
+    qInfo().noquote() << "ScreenShareSourceModel::rowCount";
     if (parent.isValid())
         return 0;
     return m_sources.size();
@@ -24,6 +26,7 @@ int ScreenShareSourceModel::rowCount(const QModelIndex &parent) const
 
 QVariant ScreenShareSourceModel::data(const QModelIndex &index, int role) const
 {
+    qInfo().noquote() << "ScreenShareSourceModel::data" << "index=" << index << "role=" << role;
     if (!index.isValid() || index.row() >= m_sources.size())
         return {};
 
@@ -38,6 +41,7 @@ QVariant ScreenShareSourceModel::data(const QModelIndex &index, int role) const
 
 QHash<int, QByteArray> ScreenShareSourceModel::roleNames() const
 {
+    qInfo().noquote() << "ScreenShareSourceModel::roleNames";
     return {
         {TitleRole, "title"},
         {KindRole, "kind"},
@@ -83,6 +87,7 @@ QString windowTitle(xcb_connection_t *conn, xcb_window_t window, xcb_atom_t netW
 
 void ScreenShareSourceModel::refresh()
 {
+    qInfo().noquote() << "ScreenShareSourceModel::refresh";
     beginResetModel();
     m_sources.clear();
 

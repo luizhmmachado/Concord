@@ -11,6 +11,7 @@ WebRtcPeerConnection::WebRtcPeerConnection(const QString &peerId, QObject *paren
     , m_remoteVideo(new VideoStreamSource(this))
     , m_remoteScreen(new VideoStreamSource(this))
 {
+    qInfo().noquote() << "WebRtcPeerConnection::WebRtcPeerConnection" << "peerId=" << peerId;
     m_remoteVideo->setObjectName(QStringLiteral("remote:%1").arg(peerId));
     m_remoteScreen->setObjectName(QStringLiteral("remoteScreen:%1").arg(peerId));
 }
@@ -19,11 +20,13 @@ WebRtcPeerConnection::WebRtcPeerConnection(const QString &peerId, QObject *paren
 
 WebRtcPeerConnection::~WebRtcPeerConnection()
 {
+    qInfo().noquote() << "WebRtcPeerConnection::~WebRtcPeerConnection";
     stop();
 }
 
 void WebRtcPeerConnection::start(bool polite, GstElement *webrtcbin)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::start" << "polite=" << polite << "webrtcbin=" << webrtcbin;
     if (!webrtcbin) {
         emit errorOccurred(m_peerId, QStringLiteral("webrtcbin não disponível"));
         return;
@@ -42,6 +45,7 @@ void WebRtcPeerConnection::start(bool polite, GstElement *webrtcbin)
 
 void WebRtcPeerConnection::stop()
 {
+    qInfo().noquote() << "WebRtcPeerConnection::stop";
     if (m_webrtcbin) {
         g_signal_handlers_disconnect_by_data(m_webrtcbin, this);
         gst_object_unref(m_webrtcbin);
@@ -55,6 +59,7 @@ void WebRtcPeerConnection::stop()
 
 void WebRtcPeerConnection::onIncomingStream(GstElement *webrtcbin, GstPad *pad, gpointer userData)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::onIncomingStream" << "webrtcbin=" << webrtcbin << "pad=" << pad << "userData=" << userData;
     if (GST_PAD_DIRECTION(pad) != GST_PAD_SRC)
         return;
 
@@ -90,6 +95,7 @@ void WebRtcPeerConnection::onIncomingStream(GstElement *webrtcbin, GstPad *pad, 
 
 void WebRtcPeerConnection::onDecodedPad(GstElement *decodebin, GstPad *pad, gpointer userData)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::onDecodedPad" << "decodebin=" << decodebin << "pad=" << pad << "userData=" << userData;
     auto *self = static_cast<WebRtcPeerConnection *>(userData);
 
     GstCaps *caps = gst_pad_get_current_caps(pad);
@@ -145,6 +151,7 @@ void WebRtcPeerConnection::onDecodedPad(GstElement *decodebin, GstPad *pad, gpoi
 
 void WebRtcPeerConnection::createOffer()
 {
+    qInfo().noquote() << "WebRtcPeerConnection::createOffer";
     if (!m_webrtcbin)
         return;
     GstPromise *promise = gst_promise_new_with_change_func(onOfferCreated, this, nullptr);
@@ -153,6 +160,7 @@ void WebRtcPeerConnection::createOffer()
 
 void WebRtcPeerConnection::createAnswer()
 {
+    qInfo().noquote() << "WebRtcPeerConnection::createAnswer";
     if (!m_webrtcbin)
         return;
     GstPromise *promise = gst_promise_new_with_change_func(onAnswerCreated, this, nullptr);
@@ -161,6 +169,7 @@ void WebRtcPeerConnection::createAnswer()
 
 void WebRtcPeerConnection::applyRemoteDescription(const QString &sdpType, const QString &sdp)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::applyRemoteDescription" << "sdpType=" << sdpType << "sdp=" << sdp;
     qInfo() << "[rtc]" << m_peerId << "remote description" << sdpType << "bytes=" << sdp.size()
             << "hasBin=" << (m_webrtcbin != nullptr);
     if (!m_webrtcbin)
@@ -187,6 +196,7 @@ void WebRtcPeerConnection::applyRemoteDescription(const QString &sdpType, const 
 
 void WebRtcPeerConnection::applyRemoteIceCandidate(const QString &candidate, int mLineIndex)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::applyRemoteIceCandidate" << "candidate=" << candidate << "mLineIndex=" << mLineIndex;
     if (!m_webrtcbin)
         return;
     g_signal_emit_by_name(m_webrtcbin, "add-ice-candidate", static_cast<guint>(mLineIndex), candidate.toUtf8().constData());
@@ -194,6 +204,7 @@ void WebRtcPeerConnection::applyRemoteIceCandidate(const QString &candidate, int
 
 void WebRtcPeerConnection::onNegotiationNeeded(GstElement *, gpointer userData)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::onNegotiationNeeded" << "userData=" << userData;
     auto *self = static_cast<WebRtcPeerConnection *>(userData);
     qInfo() << "[rtc]" << self->m_peerId << "negotiation-needed polite=" << self->m_polite;
     // Only the impolite side offers; the polite side waits and answers,
@@ -205,6 +216,7 @@ void WebRtcPeerConnection::onNegotiationNeeded(GstElement *, gpointer userData)
 
 void WebRtcPeerConnection::onOfferCreated(GstPromise *promise, gpointer userData)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::onOfferCreated" << "promise=" << promise << "userData=" << userData;
     auto *self = static_cast<WebRtcPeerConnection *>(userData);
     const GstStructure *reply = gst_promise_get_reply(promise);
     GstWebRTCSessionDescription *description = nullptr;
@@ -232,6 +244,7 @@ void WebRtcPeerConnection::onOfferCreated(GstPromise *promise, gpointer userData
 
 void WebRtcPeerConnection::onAnswerCreated(GstPromise *promise, gpointer userData)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::onAnswerCreated" << "promise=" << promise << "userData=" << userData;
     auto *self = static_cast<WebRtcPeerConnection *>(userData);
     const GstStructure *reply = gst_promise_get_reply(promise);
     GstWebRTCSessionDescription *description = nullptr;
@@ -259,6 +272,7 @@ void WebRtcPeerConnection::onAnswerCreated(GstPromise *promise, gpointer userDat
 
 void WebRtcPeerConnection::onIceCandidate(GstElement *, guint mLineIndex, gchar *candidate, gpointer userData)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::onIceCandidate" << "mLineIndex=" << mLineIndex << "candidate=" << candidate << "userData=" << userData;
     auto *self = static_cast<WebRtcPeerConnection *>(userData);
     const QString candidateStr = QString::fromUtf8(candidate);
     const int index = static_cast<int>(mLineIndex);
@@ -269,6 +283,7 @@ void WebRtcPeerConnection::onIceCandidate(GstElement *, guint mLineIndex, gchar 
 
 void WebRtcPeerConnection::onIceConnectionStateNotify(GstElement *webrtcbin, GParamSpec *, gpointer userData)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::onIceConnectionStateNotify" << "webrtcbin=" << webrtcbin << "userData=" << userData;
     auto *self = static_cast<WebRtcPeerConnection *>(userData);
     GstWebRTCICEConnectionState state;
     g_object_get(webrtcbin, "ice-connection-state", &state, nullptr);
@@ -293,26 +308,33 @@ void WebRtcPeerConnection::onIceConnectionStateNotify(GstElement *webrtcbin, GPa
 
 #else // !CONCORD_HAS_GSTREAMER
 
-WebRtcPeerConnection::~WebRtcPeerConnection() = default;
+WebRtcPeerConnection::~WebRtcPeerConnection() {
+    qInfo().noquote() << "WebRtcPeerConnection::~WebRtcPeerConnection";
+}
 
 void WebRtcPeerConnection::start(bool polite, void *)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::start" << "polite=" << polite;
     Q_UNUSED(polite)
     emit connectionStateChanged(m_peerId, QStringLiteral("disabled"));
     emit errorOccurred(m_peerId,
                        QStringLiteral("Compilado sem GStreamer: áudio/vídeo indisponíveis."));
 }
 
-void WebRtcPeerConnection::stop() {}
+void WebRtcPeerConnection::stop() {
+    qInfo().noquote() << "WebRtcPeerConnection::stop";
+}
 
 void WebRtcPeerConnection::applyRemoteDescription(const QString &sdpType, const QString &sdp)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::applyRemoteDescription" << "sdpType=" << sdpType << "sdp=" << sdp;
     Q_UNUSED(sdpType)
     Q_UNUSED(sdp)
 }
 
 void WebRtcPeerConnection::applyRemoteIceCandidate(const QString &candidate, int mLineIndex)
 {
+    qInfo().noquote() << "WebRtcPeerConnection::applyRemoteIceCandidate" << "candidate=" << candidate << "mLineIndex=" << mLineIndex;
     Q_UNUSED(candidate)
     Q_UNUSED(mLineIndex)
 }
