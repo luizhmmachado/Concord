@@ -4,3 +4,5 @@ AppTextField 1.0 AppTextField.qml
 Avatar 1.0 Avatar.qml
 ComponentPopup 1.0 ComponentPopup.qml
 MemberListItem 1.0 MemberListItem.qml
+ImagePickerDialog 1.0 ImagePickerDialog.qml
+MessageImage 1.0 MessageImage.qml

@@ -3,11 +3,24 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
+#include <QDebug>
+
+namespace {
+QString messagePreview(const QJsonObject &row)
+{
+    const QString content = row.value("content").toString();
+    if (!content.isEmpty())
+        return content;
+    return row.value("image_url").toString().isEmpty() ? QString() : QStringLiteral("[Imagem]");
+}
+}
+
 DirectMessageController::DirectMessageController(SupabaseClient *client, RealtimeClient *realtime, QObject *parent)
     : QObject(parent)
     , m_client(client)
     , m_realtime(realtime)
 {
+    qInfo().noquote() << "DirectMessageController::DirectMessageController" << "client=" << client << "realtime=" << realtime;
     connect(m_client, &SupabaseClient::rpcFinished, this, [this](const QString &tag, bool ok, const QJsonValue &result, const QString &error) {
         if (tag == "dm:list") {
             setBusy(false);
@@ -57,10 +70,40 @@ DirectMessageController::DirectMessageController(SupabaseClient *client, Realtim
             return;
         // Realtime excludes the sender, so append our own message locally.
         const QJsonObject row = rows.first().toObject();
-        m_messages.appendMessage(row);
-        m_conversations.setLastMessage(row.value("conversation_id").toString(),
-                                       row.value("content").toString(),
+        const QString conversationId = row.value("conversation_id").toString();
+        m_conversations.setLastMessage(conversationId,
+                                       messagePreview(row),
                                        row.value("created_at").toString());
+        if (conversationId == m_currentConversationId)
+            m_messages.appendMessage(row);
+    });
+
+    connect(m_client, &SupabaseClient::imageUploadFinished, this, [this](const QString &tag, bool ok, const QString &publicUrl, const QString &error) {
+        if (tag != "dm:image")
+            return;
+        if (!ok) {
+            setUploading(false);
+            emit errorOccurred(error);
+            return;
+        }
+
+        const QString conversationId = m_pendingImageConversationId;
+        const QString caption = m_pendingImageCaption;
+        m_pendingImageConversationId.clear();
+        m_pendingImageCaption.clear();
+        setUploading(false);
+
+        if (conversationId.isEmpty() || publicUrl.isEmpty()) {
+            emit errorOccurred(QStringLiteral("Não foi possível enviar a imagem."));
+            return;
+        }
+
+        m_client->insert("direct_messages?select=*,profiles(username,display_name)",
+                         QJsonObject{{"conversation_id", conversationId},
+                                     {"author_id", m_client->currentUserId()},
+                                     {"content", caption},
+                                     {"image_url", publicUrl}},
+                         "dm:send");
     });
 
     connect(m_realtime, &RealtimeClient::postgresChange, this, [this](const QString &topic, const QString &eventType, const QJsonObject &record) {
@@ -70,7 +113,7 @@ DirectMessageController::DirectMessageController(SupabaseClient *client, Realtim
 
         const QString conversationId = record.value("conversation_id").toString();
         m_conversations.setLastMessage(conversationId,
-                                       record.value("content").toString(),
+                                       messagePreview(record),
                                        record.value("created_at").toString());
 
         if (conversationId == m_currentConversationId)
@@ -80,14 +123,25 @@ DirectMessageController::DirectMessageController(SupabaseClient *client, Realtim
 
 void DirectMessageController::setBusy(bool busy)
 {
+    qInfo().noquote() << "DirectMessageController::setBusy" << "busy=" << busy;
     if (m_busy == busy)
         return;
     m_busy = busy;
     emit busyChanged();
 }
 
+void DirectMessageController::setUploading(bool uploading)
+{
+    qInfo().noquote() << "DirectMessageController::setUploading" << "uploading=" << uploading;
+    if (m_uploading == uploading)
+        return;
+    m_uploading = uploading;
+    emit uploadingChanged();
+}
+
 void DirectMessageController::setLocalDisplayName(const QString &name)
 {
+    qInfo().noquote() << "DirectMessageController::setLocalDisplayName" << "name=" << name;
     if (m_localDisplayName == name)
         return;
     m_localDisplayName = name;
@@ -97,6 +151,7 @@ void DirectMessageController::setLocalDisplayName(const QString &name)
 
 void DirectMessageController::loadConversations()
 {
+    qInfo().noquote() << "DirectMessageController::loadConversations";
     if (m_client->currentUserId().isEmpty())
         return;
 
@@ -114,6 +169,7 @@ void DirectMessageController::loadConversations()
 
 void DirectMessageController::openConversation(const QString &conversationId)
 {
+    qInfo().noquote() << "DirectMessageController::openConversation" << "conversationId=" << conversationId;
     m_currentConversationId = conversationId;
     m_currentPeerName = m_conversations.peerNameFor(conversationId);
     emit currentConversationChanged();
@@ -130,6 +186,7 @@ void DirectMessageController::openConversation(const QString &conversationId)
 
 void DirectMessageController::closeConversation()
 {
+    qInfo().noquote() << "DirectMessageController::closeConversation";
     m_currentConversationId.clear();
     m_currentPeerName.clear();
     emit currentConversationChanged();
@@ -138,6 +195,7 @@ void DirectMessageController::closeConversation()
 
 void DirectMessageController::sendMessage(const QString &content)
 {
+    qInfo().noquote() << "DirectMessageController::sendMessage" << "content=" << content;
     if (content.trimmed().isEmpty() || m_currentConversationId.isEmpty())
         return;
 
@@ -148,8 +206,21 @@ void DirectMessageController::sendMessage(const QString &content)
                      "dm:send");
 }
 
+void DirectMessageController::sendImageMessage(const QString &caption, const QString &filePath)
+{
+    qInfo().noquote() << "DirectMessageController::sendImageMessage" << "caption=" << caption << "filePath=" << filePath;
+    if (m_uploading || m_currentConversationId.isEmpty() || filePath.isEmpty())
+        return;
+
+    m_pendingImageConversationId = m_currentConversationId;
+    m_pendingImageCaption = caption;
+    setUploading(true);
+    m_client->uploadChatImage(filePath, "dm:image");
+}
+
 void DirectMessageController::addFriend(const QString &usernameOrLink)
 {
+    qInfo().noquote() << "DirectMessageController::addFriend" << "usernameOrLink=" << usernameOrLink;
     QString username = usernameOrLink.trimmed();
     const int separator = username.lastIndexOf('/');
     if (separator >= 0)
@@ -167,6 +238,7 @@ void DirectMessageController::addFriend(const QString &usernameOrLink)
 
 void DirectMessageController::sendServerInvite(const QString &conversationId, const QString &inviteCode, const QString &serverName)
 {
+    qInfo().noquote() << "DirectMessageController::sendServerInvite" << "conversationId=" << conversationId << "inviteCode=" << inviteCode << "serverName=" << serverName;
     if (conversationId.isEmpty() || inviteCode.isEmpty())
         return;
 

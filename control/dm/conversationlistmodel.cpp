@@ -2,13 +2,16 @@
 
 #include <QJsonObject>
 
+#include <QDebug>
 ConversationListModel::ConversationListModel(QObject *parent)
     : QAbstractListModel(parent)
 {
+    qInfo().noquote() << "ConversationListModel::ConversationListModel";
 }
 
 int ConversationListModel::rowCount(const QModelIndex &parent) const
 {
+    qInfo().noquote() << "ConversationListModel::rowCount";
     if (parent.isValid())
         return 0;
     return m_conversations.size();
@@ -16,6 +19,7 @@ int ConversationListModel::rowCount(const QModelIndex &parent) const
 
 QVariant ConversationListModel::data(const QModelIndex &index, int role) const
 {
+    qInfo().noquote() << "ConversationListModel::data" << "index=" << index << "role=" << role;
     if (!index.isValid() || index.row() >= m_conversations.size())
         return {};
 
@@ -33,6 +37,7 @@ QVariant ConversationListModel::data(const QModelIndex &index, int role) const
 
 QHash<int, QByteArray> ConversationListModel::roleNames() const
 {
+    qInfo().noquote() << "ConversationListModel::roleNames";
     return {
         {ConversationIdRole, "conversationId"},
         {PeerIdRole, "peerId"},
@@ -45,6 +50,7 @@ QHash<int, QByteArray> ConversationListModel::roleNames() const
 
 void ConversationListModel::setConversations(const QJsonArray &rows)
 {
+    qInfo().noquote() << "ConversationListModel::setConversations" << "rows=" << rows;
     beginResetModel();
     m_conversations.clear();
     for (const QJsonValue &value : rows) {
@@ -64,6 +70,7 @@ void ConversationListModel::setConversations(const QJsonArray &rows)
 
 void ConversationListModel::setLastMessage(const QString &conversationId, const QString &content, const QString &createdAt)
 {
+    qInfo().noquote() << "ConversationListModel::setLastMessage" << "conversationId=" << conversationId << "content=" << content << "createdAt=" << createdAt;
     for (int i = 0; i < m_conversations.size(); ++i) {
         if (m_conversations.at(i).conversationId != conversationId)
             continue;
@@ -76,6 +83,7 @@ void ConversationListModel::setLastMessage(const QString &conversationId, const 
 
 QString ConversationListModel::peerNameFor(const QString &conversationId) const
 {
+    qInfo().noquote() << "ConversationListModel::peerNameFor" << "conversationId=" << conversationId;
     for (const ConversationEntry &entry : m_conversations) {
         if (entry.conversationId == conversationId)
             return entry.peerName;
@@ -85,6 +93,7 @@ QString ConversationListModel::peerNameFor(const QString &conversationId) const
 
 QString ConversationListModel::peerIdFor(const QString &conversationId) const
 {
+    qInfo().noquote() << "ConversationListModel::peerIdFor" << "conversationId=" << conversationId;
     for (const ConversationEntry &entry : m_conversations) {
         if (entry.conversationId == conversationId)
             return entry.peerId;
@@ -94,6 +103,7 @@ QString ConversationListModel::peerIdFor(const QString &conversationId) const
 
 void ConversationListModel::clear()
 {
+    qInfo().noquote() << "ConversationListModel::clear";
     beginResetModel();
     m_conversations.clear();
     endResetModel();

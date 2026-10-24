@@ -11,6 +11,7 @@ struct MessageEntry {
     QString authorId;
     QString authorName;
     QString content;
+    QString imageUrl;
     QString createdAt;
     QString timeLabel;
     // Non-empty only on the first message of a day, e.g. "24 de junho de 2026".
@@ -28,6 +29,7 @@ public:
         AuthorIdRole,
         AuthorNameRole,
         ContentRole,
+        ImageUrlRole,
         CreatedAtRole,
         TimeLabelRole,
         DaySeparatorRole,

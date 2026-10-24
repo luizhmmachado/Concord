@@ -12,6 +12,7 @@
 
 #include "control/database/supabaseclient.h"
 #include "control/database/realtimeclient.h"
+#include "control/clipboard/clipboardcontroller.h"
 #include "control/auth/authcontroller.h"
 #include "control/servers/servercontroller.h"
 #include "control/servers/servermemberscontroller.h"
@@ -100,6 +101,7 @@ int main(int argc, char *argv[])
     // its destructor) and RealtimeClient (closes its socket in its dtor).
     SupabaseClient supabaseClient;
     supabaseClient.configure(kSupabaseUrl, kSupabaseAnonKey);
+    ClipboardController clipboardController;
 
     RealtimeClient realtimeClient;
 
@@ -177,6 +179,7 @@ int main(int argc, char *argv[])
     QQmlContext *ctx = engine.rootContext();
     ctx->setContextProperty("screenCaptureSupported", !isWaylandSession());
     ctx->setContextProperty("supabaseClient", &supabaseClient);
+    ctx->setContextProperty("clipboardController", &clipboardController);
     ctx->setContextProperty("realtimeClient", &realtimeClient);
     ctx->setContextProperty("authController", &authController);
     ctx->setContextProperty("serverController", &serverController);

@@ -72,10 +72,15 @@ Rectangle {
                         Text { text: timeLabel; color: Theme.textSecondary; font.pixelSize: 11 }
                     }
                     Text {
+                        visible: content.length > 0
                         text: content
                         color: Theme.textPrimary
                         wrapMode: Text.WordWrap
                         width: parent.width
+                    }
+                    MessageImage {
+                        imageSource: imageUrl
+                        maxWidth: 360
                     }
                 }
             }
@@ -94,9 +99,32 @@ Rectangle {
 
         AppTextField {
             id: messageField
-            width: parent.width - sendButton.width - 8
+            width: parent.width - attachButton.width - sendButton.width - 16
             placeholderText: "Enviar mensagem..."
             onAccepted: sendButton.clicked()
+
+            Keys.priority: Keys.BeforeItem
+            Keys.onPressed: {
+                if (event.matches(StandardKey.Paste)
+                        && !chatController.uploading
+                        && chatController.currentChannelId.length > 0) {
+                    var path = clipboardController.pastedImagePath()
+                    if (path.length > 0) {
+                        chatController.sendImageMessage(messageField.text, path)
+                        messageField.text = ""
+                        event.accepted = true
+                    }
+                }
+            }
+        }
+
+        AppButton {
+            id: attachButton
+            text: chatController.uploading ? "Enviando" : "Imagem"
+            baseColor: Theme.surfaceAlt
+            textColor: Theme.textPrimary
+            enabled: !chatController.uploading && chatController.currentChannelId.length > 0
+            onClicked: imagePicker.open()
         }
 
         AppButton {
@@ -108,6 +136,14 @@ Rectangle {
                 chatController.sendMessage(messageField.text)
                 messageField.text = ""
             }
+        }
+    }
+
+    ImagePickerDialog {
+        id: imagePicker
+        onImageSelected: {
+            chatController.sendImageMessage(messageField.text, selectedUrl.toString())
+            messageField.text = ""
         }
     }
 }

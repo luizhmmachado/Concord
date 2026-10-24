@@ -8,6 +8,7 @@ DEFINES += CONCORD_HAS_GSTREAMER=0
 SOURCES += \
     main.cpp \
     control/database/supabaseclient.cpp \
+    control/clipboard/clipboardcontroller.cpp \
     control/database/realtimeclient.cpp \
     control/auth/authcontroller.cpp \
     control/servers/servercontroller.cpp \
@@ -33,6 +34,7 @@ SOURCES += \
 
 HEADERS += \
     control/database/supabaseclient.h \
+    control/clipboard/clipboardcontroller.h \
     control/database/realtimeclient.h \
     control/auth/authcontroller.h \
     control/servers/servercontroller.h \

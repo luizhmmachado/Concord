@@ -3,13 +3,16 @@
 #include <QDateTime>
 #include <QLocale>
 
+#include <QDebug>
 MessageListModel::MessageListModel(QObject *parent)
     : QAbstractListModel(parent)
 {
+    qInfo().noquote() << "MessageListModel::MessageListModel";
 }
 
 MessageEntry MessageListModel::fromJson(const QJsonObject &obj) const
 {
+    qInfo().noquote() << "MessageListModel::fromJson" << "obj=" << obj;
     const QJsonObject author = obj.value("profiles").toObject();
     const QString authorId = obj.value("author_id").toString();
 
@@ -25,6 +28,7 @@ MessageEntry MessageListModel::fromJson(const QJsonObject &obj) const
     entry.authorId = authorId;
     entry.authorName = authorName;
     entry.content = obj.value("content").toString();
+    entry.imageUrl = obj.value("image_url").toString();
     entry.createdAt = createdAt;
     entry.timeLabel = timestamp.isValid() ? timestamp.toString(QStringLiteral("HH:mm")) : QString();
     return entry;
@@ -32,6 +36,7 @@ MessageEntry MessageListModel::fromJson(const QJsonObject &obj) const
 
 void MessageListModel::applyDaySeparator(MessageEntry &entry, const MessageEntry *previous) const
 {
+    qInfo().noquote() << "MessageListModel::applyDaySeparator" << "entryId=" << entry.id;
     const QDate day = QDateTime::fromString(entry.createdAt, Qt::ISODateWithMs).toLocalTime().date();
     if (!day.isValid()) {
         entry.daySeparator.clear();
@@ -57,6 +62,7 @@ void MessageListModel::applyDaySeparator(MessageEntry &entry, const MessageEntry
 
 void MessageListModel::applyGrouping(MessageEntry &entry, const MessageEntry *previous) const
 {
+    qInfo().noquote() << "MessageListModel::applyGrouping" << "entryId=" << entry.id;
     if (!previous || !entry.daySeparator.isEmpty() || previous->authorId != entry.authorId) {
         entry.grouped = false;
         return;
@@ -70,6 +76,7 @@ void MessageListModel::applyGrouping(MessageEntry &entry, const MessageEntry *pr
 
 int MessageListModel::indexOfId(const QString &id) const
 {
+    qInfo().noquote() << "MessageListModel::indexOfId" << "id=" << id;
     for (int i = 0; i < m_messages.size(); ++i) {
         if (m_messages.at(i).id == id)
             return i;
@@ -79,6 +86,7 @@ int MessageListModel::indexOfId(const QString &id) const
 
 void MessageListModel::setAuthorNameFallback(const QString &authorId, const QString &name)
 {
+    qInfo().noquote() << "MessageListModel::setAuthorNameFallback" << "authorId=" << authorId << "name=" << name;
     if (authorId.isEmpty() || name.isEmpty())
         return;
     m_authorNameFallback.insert(authorId, name);
@@ -86,6 +94,7 @@ void MessageListModel::setAuthorNameFallback(const QString &authorId, const QStr
 
 int MessageListModel::rowCount(const QModelIndex &parent) const
 {
+    qInfo().noquote() << "MessageListModel::rowCount";
     if (parent.isValid())
         return 0;
     return m_messages.size();
@@ -93,6 +102,7 @@ int MessageListModel::rowCount(const QModelIndex &parent) const
 
 QVariant MessageListModel::data(const QModelIndex &index, int role) const
 {
+    qInfo().noquote() << "MessageListModel::data" << "index=" << index << "role=" << role;
     if (!index.isValid() || index.row() >= m_messages.size())
         return {};
 
@@ -102,6 +112,7 @@ QVariant MessageListModel::data(const QModelIndex &index, int role) const
     case AuthorIdRole: return entry.authorId;
     case AuthorNameRole: return entry.authorName;
     case ContentRole: return entry.content;
+    case ImageUrlRole: return entry.imageUrl;
     case CreatedAtRole: return entry.createdAt;
     case TimeLabelRole: return entry.timeLabel;
     case DaySeparatorRole: return entry.daySeparator;
@@ -112,11 +123,13 @@ QVariant MessageListModel::data(const QModelIndex &index, int role) const
 
 QHash<int, QByteArray> MessageListModel::roleNames() const
 {
+    qInfo().noquote() << "MessageListModel::roleNames";
     return {
         {IdRole, "messageId"},
         {AuthorIdRole, "authorId"},
         {AuthorNameRole, "authorName"},
         {ContentRole, "content"},
+        {ImageUrlRole, "imageUrl"},
         {CreatedAtRole, "createdAt"},
         {TimeLabelRole, "timeLabel"},
         {DaySeparatorRole, "daySeparator"},
@@ -126,6 +139,7 @@ QHash<int, QByteArray> MessageListModel::roleNames() const
 
 void MessageListModel::setMessages(const QJsonArray &rows)
 {
+    qInfo().noquote() << "MessageListModel::setMessages" << "rows=" << rows;
     beginResetModel();
     m_messages.clear();
     for (const QJsonValue &value : rows) {
@@ -140,6 +154,7 @@ void MessageListModel::setMessages(const QJsonArray &rows)
 
 void MessageListModel::appendMessage(const QJsonObject &row)
 {
+    qInfo().noquote() << "MessageListModel::appendMessage" << "row=" << row;
     MessageEntry entry = fromJson(row);
 
     // The sender receives its own message twice (the insert response and the
@@ -166,6 +181,7 @@ void MessageListModel::appendMessage(const QJsonObject &row)
 
 void MessageListModel::clear()
 {
+    qInfo().noquote() << "MessageListModel::clear";
     beginResetModel();
     m_messages.clear();
     endResetModel();

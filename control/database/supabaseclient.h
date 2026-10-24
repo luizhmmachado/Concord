@@ -50,6 +50,10 @@ public:
     // Calls a PostgREST RPC endpoint (Postgres function exposed via `/rest/v1/rpc/<name>`).
     void rpc(const QString &functionName, const QJsonObject &params, const QString &tag = QString());
 
+    // Uploads an image to the public `chat-images` bucket under the current
+    // user's folder and emits imageUploadFinished with its public URL.
+    void uploadChatImage(const QString &localFilePath, const QString &tag = QString());
+
 signals:
     void signUpFinished(bool success, const QJsonObject &data, const QString &error);
     void signInFinished(bool success, const QJsonObject &data, const QString &error);
@@ -62,6 +66,7 @@ signals:
     void updateFinished(const QString &requestId, bool success, const QJsonArray &rows, const QString &error);
     void deleteFinished(const QString &requestId, bool success, const QString &error);
     void rpcFinished(const QString &requestId, bool success, const QJsonValue &result, const QString &error);
+    void imageUploadFinished(const QString &requestId, bool success, const QString &publicUrl, const QString &error);
 
 private:
     QNetworkRequest buildRequest(const QUrl &url, bool withAuth = true) const;

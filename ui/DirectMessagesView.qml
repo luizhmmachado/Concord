@@ -213,10 +213,15 @@ Rectangle {
                             Text { text: timeLabel; color: Theme.textSecondary; font.pixelSize: 11 }
                         }
                         Text {
+                            visible: content.length > 0
                             text: content
                             color: Theme.textPrimary
                             wrapMode: Text.WordWrap
                             width: parent.width
+                        }
+                        MessageImage {
+                            imageSource: imageUrl
+                            maxWidth: 360
                         }
                     }
                 }
@@ -236,9 +241,32 @@ Rectangle {
 
             AppTextField {
                 id: messageField
-                width: parent.width - sendButton.width - 8
+                width: parent.width - attachButton.width - sendButton.width - 16
                 placeholderText: "Enviar mensagem para " + directMessageController.currentPeerName + "..."
                 onAccepted: sendButton.clicked()
+
+                Keys.priority: Keys.BeforeItem
+                Keys.onPressed: {
+                    if (event.matches(StandardKey.Paste)
+                            && !directMessageController.uploading
+                            && directMessageController.currentConversationId.length > 0) {
+                        var path = clipboardController.pastedImagePath()
+                        if (path.length > 0) {
+                            directMessageController.sendImageMessage(messageField.text, path)
+                            messageField.text = ""
+                            event.accepted = true
+                        }
+                    }
+                }
+            }
+
+            AppButton {
+                id: attachButton
+                text: directMessageController.uploading ? "Enviando" : "Imagem"
+                baseColor: Theme.surfaceAlt
+                textColor: Theme.textPrimary
+                enabled: !directMessageController.uploading && directMessageController.currentConversationId.length > 0
+                onClicked: imagePicker.open()
             }
 
             AppButton {
@@ -252,11 +280,17 @@ Rectangle {
         }
     }
 
-    Dialog {
+    ImagePickerDialog {
+        id: imagePicker
+        onImageSelected: {
+            directMessageController.sendImageMessage(messageField.text, selectedUrl.toString())
+            messageField.text = ""
+        }
+    }
+
+    ComponentPopup {
         id: addFriendDialog
         title: "Adicionar amigo"
-        modal: true
-        anchors.centerIn: parent
         standardButtons: Dialog.Ok | Dialog.Cancel
 
         Column {
