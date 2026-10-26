@@ -11,13 +11,27 @@ ComponentPopup {
     width: 460
     height: 540
 
-    readonly property string inviteLink: "concord://invite/" + serverController.currentServerInviteCode
+    readonly property bool hasInviteCode: serverController.currentServerInviteCode.length > 0
+    readonly property string inviteLink: hasInviteCode
+                                          ? "concord://invite/" + serverController.currentServerInviteCode
+                                          : ""
 
     property string sentToConversationId: ""
 
     onOpened: {
         sentToConversationId = ""
         directMessageController.loadConversations()
+        serverController.requestInviteCode()
+    }
+
+    Connections {
+        target: serverController
+        function onCurrentServerChanged() {
+            if (!root.opened)
+                return
+            root.sentToConversationId = ""
+            serverController.requestInviteCode()
+        }
     }
 
     ColumnLayout {
@@ -43,6 +57,23 @@ ComponentPopup {
                 font.pixelSize: 18
                 MouseArea { anchors.fill: parent; onClicked: root.close() }
             }
+        }
+
+        Text {
+            visible: serverController.inviteCodeLoading
+            Layout.fillWidth: true
+            text: "Gerando convite..."
+            color: Theme.textSecondary
+            font.pixelSize: 11
+        }
+
+        Text {
+            visible: !serverController.inviteCodeLoading && !root.hasInviteCode
+            Layout.fillWidth: true
+            text: "Não foi possível gerar o convite. Verifique se você ainda pode convidar pessoas."
+            color: Theme.danger
+            font.pixelSize: 11
+            wrapMode: Text.WordWrap
         }
 
         AppTextField {
@@ -108,7 +139,7 @@ ComponentPopup {
                     AppButton {
                         anchors.verticalCenter: parent.verticalCenter
                         text: root.sentToConversationId === conversationId ? "Enviado" : "Convidar"
-                        enabled: root.sentToConversationId !== conversationId
+                        enabled: root.sentToConversationId !== conversationId && root.hasInviteCode
                         baseColor: root.sentToConversationId === conversationId ? Theme.surfaceAlt : Theme.accent
                         onClicked: {
                             directMessageController.sendServerInvite(conversationId,
@@ -152,6 +183,7 @@ ComponentPopup {
 
             AppButton {
                 text: "Copiar"
+                enabled: root.hasInviteCode
                 onClicked: {
                     linkField.selectAll()
                     linkField.copy()

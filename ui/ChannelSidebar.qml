@@ -40,6 +40,8 @@ Rectangle {
         AppButton {
             width: root.width - 16
             visible: serverController.currentServerId.length > 0
+                     && serverMembers.currentServerId === serverController.currentServerId
+                     && serverMembers.canInvite
             text: "\u2795 Convidar pessoas"
             baseColor: Theme.accent
             onClicked: serverInvitePopup.open()
