@@ -44,7 +44,7 @@ static bool isWaylandSession()
 {
     const QString sessionType = QString::fromLocal8Bit(qgetenv("XDG_SESSION_TYPE"));
     const QString waylandDisplay = QString::fromLocal8Bit(qgetenv("WAYLAND_DISPLAY"));
-    return !sessionType.isEmpty() && sessionType.compare("wayland", Qt::CaseInsensitive) == 0
+    return (!sessionType.isEmpty() && sessionType.compare("wayland", Qt::CaseInsensitive) == 0)
         || !waylandDisplay.isEmpty();
 }
 
@@ -58,6 +58,7 @@ public:
 
     QPixmap requestPixmap(const QString &id, QSize *size, const QSize &requestedSize) override
     {
+        Q_UNUSED(id)
         if (isWaylandSession())
             return QPixmap();
 
