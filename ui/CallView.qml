@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Window 2.15
 import QtMultimedia 5.15
 import "qrc:/style"
 import "qrc:/ui/Components"
@@ -12,6 +13,12 @@ Rectangle {
 
     // Transmissões remotas ficam esmaecidas até o usuário optar por assistir.
     property var watching: ({})
+
+    readonly property bool wantScreenPreview: Window.active && callController.screenSharing
+
+    onWantScreenPreviewChanged: callController.screenPreviewEnabled = wantScreenPreview
+    Component.onCompleted: callController.screenPreviewEnabled = wantScreenPreview
+    Component.onDestruction: callController.screenPreviewEnabled = false
 
     function isWatching(userId) {
         return watching[userId] === true
@@ -51,32 +58,42 @@ Rectangle {
                 required property var screenSource
 
                 readonly property bool isLocal: shareTile.userId === authController.userId
-                // O próprio preview nunca é ocultado.
+                readonly property bool localPreviewHidden: isLocal && !Window.active
                 readonly property bool revealed: isLocal || root.isWatching(shareTile.userId)
-                readonly property real aspect: {
-                    var size = shareTile.screenSource ? shareTile.screenSource.frameSize : null
-                    return (size && size.height > 0) ? size.width / size.height : 16 / 9
-                }
+                readonly property real tileWidth: Math.min(shareList.width, shareList.height * 16 / 9)
 
                 visible: shareTile.screenSharing
-                width: visible ? Math.min(shareList.width, shareList.height * aspect) : 0
+                width: visible ? tileWidth : 0
                 height: shareList.height
 
                 Rectangle {
-                    anchors.fill: parent
+                    anchors.centerIn: parent
+                    width: shareTile.tileWidth
+                    height: shareTile.tileWidth * 9 / 16
                     radius: Theme.radiusMedium
-                    color: Theme.surface
+                    color: shareTile.localPreviewHidden ? Theme.background : Theme.surface
                     border.width: 1
-                    border.color: shareTile.revealed ? Qt.rgba(0.12, 0.82, 0.76, 0.55)
-                                                     : Qt.rgba(1, 1, 1, 0.12)
+                    border.color: shareTile.localPreviewHidden ? Qt.rgba(1, 1, 1, 0.06)
+                                                               : (shareTile.revealed ? Qt.rgba(0.12, 0.82, 0.76, 0.55)
+                                                                                     : Qt.rgba(1, 1, 1, 0.12))
                     clip: true
 
                     VideoOutput {
                         anchors.fill: parent
                         anchors.margins: 1
+                        visible: !shareTile.localPreviewHidden
                         source: shareTile.screenSource
                         fillMode: VideoOutput.PreserveAspectFit
                         opacity: shareTile.revealed ? 1.0 : 0.15
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: shareTile.localPreviewHidden
+                        text: "Transmissão pausada"
+                        color: Theme.textSecondary
+                        font.pixelSize: 14
+                        font.bold: true
                     }
 
                     Column {

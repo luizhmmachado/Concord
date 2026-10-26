@@ -114,8 +114,8 @@ bool CallMediaEngine::start()
         "videotestsrc name=scrblack pattern=black is-live=true ! "
         "video/x-raw,width=1280,height=720,framerate=15/1 ! videoconvert ! "
         "input-selector name=scrsel sync-streams=false ! tee name=scrtee allow-not-linked=true "
-        "scrtee. ! queue max-size-buffers=1 leaky=downstream ! videoconvert ! "
-        "videorate drop-only=true ! video/x-raw,framerate=15/1 ! videoscale ! "
+        "scrtee. ! valve name=scrpreviewvalve drop=true ! queue max-size-buffers=1 leaky=downstream ! "
+        "videoconvert ! videorate drop-only=true ! video/x-raw,framerate=15/1 ! videoscale ! "
         "video/x-raw,height=720,pixel-aspect-ratio=1/1 ! videoconvert ! "
         "video/x-raw,format=BGRA ! appsink name=scrpreview "
 
@@ -141,6 +141,9 @@ bool CallMediaEngine::start()
     m_cameraTee = gst_bin_get_by_name(GST_BIN(m_pipeline), "camtee");
     m_screenTee = gst_bin_get_by_name(GST_BIN(m_pipeline), "scrtee");
     m_micTee = gst_bin_get_by_name(GST_BIN(m_pipeline), "mictee");
+    m_screenPreviewValve = gst_bin_get_by_name(GST_BIN(m_pipeline), "scrpreviewvalve");
+    if (m_screenPreviewValve)
+        g_object_set(m_screenPreviewValve, "drop", m_screenPreviewEnabled ? FALSE : TRUE, nullptr);
 
     if (m_cameraSelector)
         m_cameraBlackPad = gst_element_get_static_pad(m_cameraSelector, "sink_0");
@@ -152,6 +155,7 @@ bool CallMediaEngine::start()
             << "camtee" << (m_cameraTee != nullptr)
             << "scrtee" << (m_screenTee != nullptr)
             << "mictee" << (m_micTee != nullptr)
+            << "scrpreviewvalve" << (m_screenPreviewValve != nullptr)
             << "camBlackPad" << (m_cameraBlackPad != nullptr)
             << "scrBlackPad" << (m_screenBlackPad != nullptr);
 
@@ -202,6 +206,7 @@ void CallMediaEngine::stop()
     release(&m_cameraTee);
     release(&m_screenTee);
     release(&m_micTee);
+    release(&m_screenPreviewValve);
     releasePad(&m_cameraBlackPad);
     releasePad(&m_screenBlackPad);
 
@@ -357,6 +362,14 @@ void CallMediaEngine::setScreenCaptureDescription(const QString &description)
     m_screenCaptureDescription = description;
 }
 
+void CallMediaEngine::setScreenPreviewEnabled(bool enabled)
+{
+    qInfo().noquote() << "CallMediaEngine::setScreenPreviewEnabled" << "enabled=" << enabled;
+    m_screenPreviewEnabled = enabled;
+    if (m_screenPreviewValve)
+        g_object_set(m_screenPreviewValve, "drop", enabled ? FALSE : TRUE, nullptr);
+}
+
 void CallMediaEngine::setScreenShareSettings(int height, int fps)
 {
     const int normalizedHeight = normalizeScreenShareHeight(height);
@@ -371,8 +384,6 @@ void CallMediaEngine::setScreenShareSettings(int height, int fps)
     applyScreenShareEncoding();
 
     if (m_screenSharing && m_screenSource) {
-        // The capture caps are baked into the live source bin, so rebuild it
-        // to make a settings change take effect immediately.
         setScreenSharingEnabled(false);
         setScreenSharingEnabled(true);
     }
@@ -597,6 +608,12 @@ void CallMediaEngine::setScreenShareSettings(int height, int fps)
     qInfo().noquote() << "CallMediaEngine::setScreenShareSettings" << "height=" << height << "fps=" << fps;
     m_screenShareHeight = height >= 1080 ? 1080 : 720;
     m_screenShareFps = fps >= 60 ? 60 : 30;
+}
+
+void CallMediaEngine::setScreenPreviewEnabled(bool enabled)
+{
+    qInfo().noquote() << "CallMediaEngine::setScreenPreviewEnabled" << "enabled=" << enabled;
+    m_screenPreviewEnabled = enabled;
 }
 
 void *CallMediaEngine::createPeerBin(const QString &peerId)

@@ -372,6 +372,16 @@ void CallController::setScreenShareFps(int fps)
     emit screenShareSettingsChanged();
 }
 
+void CallController::setScreenPreviewEnabled(bool enabled)
+{
+    qInfo().noquote() << "CallController::setScreenPreviewEnabled" << "enabled=" << enabled;
+    if (m_screenPreviewEnabled == enabled)
+        return;
+    m_screenPreviewEnabled = enabled;
+    m_media.setScreenPreviewEnabled(enabled);
+    emit screenPreviewEnabledChanged();
+}
+
 void CallController::persistScreenShareSettings()
 {
     qInfo().noquote() << "CallController::persistScreenShareSettings"
@@ -403,8 +413,6 @@ void CallController::startScreenShare(int sourceIndex)
     const ScreenShareSource &source = m_screenShareSources.at(sourceIndex);
     QString capture;
 #ifdef Q_OS_LINUX
-    // XDamage only pushes frames when the source actually changes, which keeps
-    // idle desktops cheap and leaves more CPU for the encoder at 60 fps.
     if (source.kind == ScreenShareSource::Window) {
         capture = QStringLiteral("ximagesrc use-damage=true xid=%1").arg(source.windowId);
     } else {

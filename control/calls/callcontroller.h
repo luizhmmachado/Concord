@@ -25,6 +25,7 @@ class CallController : public QObject
     Q_PROPERTY(bool screenSharing READ screenSharing NOTIFY screenSharingChanged)
     Q_PROPERTY(int screenShareHeight READ screenShareHeight WRITE setScreenShareHeight NOTIFY screenShareSettingsChanged)
     Q_PROPERTY(int screenShareFps READ screenShareFps WRITE setScreenShareFps NOTIFY screenShareSettingsChanged)
+    Q_PROPERTY(bool screenPreviewEnabled READ screenPreviewEnabled WRITE setScreenPreviewEnabled NOTIFY screenPreviewEnabledChanged)
     Q_PROPERTY(QString callChannelId READ callChannelId NOTIFY callChannelIdChanged)
     Q_PROPERTY(CallParticipantModel *participants READ participants CONSTANT)
     Q_PROPERTY(QObject *screenSource READ screenSource CONSTANT)
@@ -45,8 +46,10 @@ public:
     bool screenSharing() const { return m_screenSharing; }
     int screenShareHeight() const { return m_screenShareHeight; }
     int screenShareFps() const { return m_screenShareFps; }
+    bool screenPreviewEnabled() const { return m_screenPreviewEnabled; }
     void setScreenShareHeight(int height);
     void setScreenShareFps(int fps);
+    void setScreenPreviewEnabled(bool enabled);
     QString callChannelId() const { return m_callChannelId; }
     // Server that owns the voice channel; used to publish ephemeral presence.
     QString callServerId() const { return m_callServerId; }
@@ -81,6 +84,7 @@ signals:
     void cameraEnabledChanged();
     void screenSharingChanged();
     void screenShareSettingsChanged();
+    void screenPreviewEnabledChanged();
     void callChannelIdChanged();
     void localDisplayNameChanged();
     void activeScreenChanged();
@@ -117,6 +121,7 @@ private:
     bool m_screenSharing = false;
     int m_screenShareHeight = 1080;
     int m_screenShareFps = 30;
+    bool m_screenPreviewEnabled = false;
     QString m_localParticipantId;
     QString m_localDisplayName;
     QString m_activeScreenOwner;
