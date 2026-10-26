@@ -157,92 +157,102 @@ Rectangle {
         }
     }
 
-    GridView {
-        id: grid
+    Item {
+        id: gridArea
         anchors.top: shareStage.visible ? shareStage.bottom : parent.top
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: controlBar.top
         anchors.margins: 12
-
-        readonly property int tileCount: Math.max(1, count)
-        readonly property int columns: Math.max(1, Math.ceil(Math.sqrt(tileCount)))
-        readonly property int rows: Math.max(1, Math.ceil(tileCount / columns))
-
-        cellWidth: Math.floor(width / columns)
-        cellHeight: Math.floor(height / rows)
-        model: callController.participants
-        interactive: false
         clip: true
 
-        delegate: Item {
-            id: participantCell
-            required property string userId
-            required property string displayName
-            required property bool muted
-            required property bool cameraOn
-            required property bool screenSharing
-            required property string connectionState
-            required property var videoSource
+        Grid {
+            id: participantGrid
+            anchors.centerIn: parent
+            columns: participantGrid.columnCount
+            columnSpacing: 12
+            rowSpacing: 12
 
-            readonly property bool isLocal: participantCell.userId === authController.userId
-            readonly property bool showCamera: participantCell.videoSource !== null
-                                               && (isLocal ? callController.cameraEnabled : participantCell.cameraOn)
+            readonly property int columnCount: Math.max(1, Math.ceil(Math.sqrt(Math.max(1, participantRepeater.count))))
+            readonly property int rowCount: Math.max(1, Math.ceil(participantRepeater.count / columnCount))
+            readonly property real tileWidth: Math.max(1, Math.floor(Math.min(
+                (gridArea.width - (columnCount - 1) * columnSpacing) / columnCount,
+                ((gridArea.height - (rowCount - 1) * rowSpacing) / rowCount) * 16 / 9)))
+            readonly property real tileHeight: Math.floor(tileWidth * 9 / 16)
 
-            width: grid.cellWidth
-            height: grid.cellHeight
+            Repeater {
+                id: participantRepeater
+                model: callController.participants
 
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 6
-                radius: Theme.radiusMedium
-                color: Theme.surface
-                clip: true
+                delegate: Item {
+                    id: participantCell
+                    required property string userId
+                    required property string displayName
+                    required property bool muted
+                    required property bool cameraOn
+                    required property bool screenSharing
+                    required property string connectionState
+                    required property var videoSource
 
-                Avatar {
-                    anchors.centerIn: parent
-                    visible: !participantCell.showCamera
-                    displayName: participantCell.displayName
-                    width: Math.min(parent.width, parent.height) * 0.4
-                    height: width
-                }
+                    readonly property bool isLocal: participantCell.userId === authController.userId
+                    readonly property bool showCamera: participantCell.videoSource !== null
+                                                       && (isLocal ? callController.cameraEnabled : participantCell.cameraOn)
 
-                VideoOutput {
-                    anchors.fill: parent
-                    visible: participantCell.showCamera
-                    source: participantCell.videoSource
-                    fillMode: VideoOutput.PreserveAspectCrop
-                }
+                    width: participantGrid.tileWidth
+                    height: participantGrid.tileHeight
 
-                Text {
-                    anchors.bottom: parent.bottom
-                    anchors.left: parent.left
-                    anchors.right: statusRow.left
-                    anchors.margins: 8
-                    text: participantCell.displayName
-                    color: Theme.textPrimary
-                    font.bold: true
-                    font.pixelSize: 11
-                    elide: Text.ElideRight
-                }
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.radiusMedium
+                        color: Theme.surface
+                        clip: true
 
-                Row {
-                    id: statusRow
-                    anchors.bottom: parent.bottom
-                    anchors.right: parent.right
-                    anchors.margins: 8
-                    spacing: 4
-                    Text { visible: participantCell.muted; text: "🔇"; font.pixelSize: 11 }
-                    Text { visible: participantCell.screenSharing; text: "🖥"; color: Theme.accent; font.pixelSize: 11 }
-                }
+                        Avatar {
+                            anchors.centerIn: parent
+                            visible: !participantCell.showCamera
+                            displayName: participantCell.displayName
+                            width: Math.min(parent.width, parent.height) * 0.4
+                            height: width
+                        }
 
-                Text {
-                    anchors.top: parent.top
-                    anchors.right: parent.right
-                    anchors.margins: 8
-                    text: participantCell.connectionState
-                    color: Theme.textSecondary
-                    font.pixelSize: 9
+                        VideoOutput {
+                            anchors.fill: parent
+                            visible: participantCell.showCamera
+                            source: participantCell.videoSource
+                            fillMode: VideoOutput.PreserveAspectCrop
+                        }
+
+                        Text {
+                            anchors.bottom: parent.bottom
+                            anchors.left: parent.left
+                            anchors.right: statusRow.left
+                            anchors.margins: 8
+                            text: participantCell.displayName
+                            color: Theme.textPrimary
+                            font.bold: true
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
+
+                        Row {
+                            id: statusRow
+                            anchors.bottom: parent.bottom
+                            anchors.right: parent.right
+                            anchors.margins: 8
+                            spacing: 4
+                            Text { visible: participantCell.muted; text: "🔇"; font.pixelSize: 11 }
+                            Text { visible: participantCell.screenSharing; text: "🖥"; color: Theme.accent; font.pixelSize: 11 }
+                        }
+
+                        Text {
+                            anchors.top: parent.top
+                            anchors.right: parent.right
+                            anchors.margins: 8
+                            text: participantCell.connectionState
+                            color: Theme.textSecondary
+                            font.pixelSize: 9
+                        }
+                    }
                 }
             }
         }
