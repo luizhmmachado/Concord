@@ -238,7 +238,7 @@ void DirectMessageController::addFriend(const QString &usernameOrLink)
 
 void DirectMessageController::sendServerInvite(const QString &conversationId, const QString &inviteCode, const QString &serverName)
 {
-    qInfo().noquote() << "DirectMessageController::sendServerInvite" << "conversationId=" << conversationId << "inviteCode=" << inviteCode << "serverName=" << serverName;
+    qInfo().noquote() << "DirectMessageController::sendServerInvite" << "conversationId=" << conversationId << "serverName=" << serverName;
     if (conversationId.isEmpty() || inviteCode.isEmpty())
         return;
 
