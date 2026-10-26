@@ -13,7 +13,7 @@ Rectangle {
     property string activeChannelType: ""
     property bool showSettings: false
     property bool showServerSettings: false
-    property bool showDirectMessages: false
+    property bool showDirectMessages: true
     property string bannerMessage: ""
 
     Component.onCompleted: serverController.loadServers(authController.userId)
