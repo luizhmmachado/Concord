@@ -169,8 +169,8 @@ Rectangle {
             AppTextField { id: channelNameField; placeholderText: "nome-do-canal"; width: 240 }
             Row {
                 spacing: 8
-                RadioButton { id: textTypeRadio; text: "Texto"; checked: true }
-                RadioButton { id: voiceTypeRadio; text: "Voz" }
+                AppRadioButton { id: textTypeRadio; text: "Texto"; checked: true }
+                AppRadioButton { id: voiceTypeRadio; text: "Voz" }
             }
         }
 

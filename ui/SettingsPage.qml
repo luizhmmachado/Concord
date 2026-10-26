@@ -333,21 +333,21 @@ Rectangle {
                 rowSpacing: 12
                 columnSpacing: 12
                 Label { text: "Microphone"; color: Theme.textSecondary }
-                ComboBox {
+                AppComboBox {
                     Layout.fillWidth: true
                     model: mediaDeviceController.microphones
                     currentIndex: model.indexOf(settingsController.inputDevice)
                     onActivated: settingsController.inputDevice = model[currentIndex]
                 }
                 Label { text: "Speaker"; color: Theme.textSecondary }
-                ComboBox {
+                AppComboBox {
                     Layout.fillWidth: true
                     model: mediaDeviceController.speakers
                     currentIndex: model.indexOf(settingsController.outputDevice)
                     onActivated: settingsController.outputDevice = model[currentIndex]
                 }
                 Label { text: "Camera"; color: Theme.textSecondary }
-                ComboBox {
+                AppComboBox {
                     Layout.fillWidth: true
                     model: mediaDeviceController.cameras
                     currentIndex: model.indexOf(settingsController.videoDevice)
@@ -405,7 +405,7 @@ Rectangle {
                 font.pixelSize: 28
                 font.bold: true
             }
-            CheckBox {
+            AppCheckBox {
                 text: "Enable notifications"
                 checked: settingsController.notificationsEnabled
                 onToggled: settingsController.notificationsEnabled = checked

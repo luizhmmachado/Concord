@@ -17,6 +17,9 @@
         <file>ui/SettingsPage.qml</file>
         <file>ui/Components/qmldir</file>
         <file>ui/Components/AppButton.qml</file>
+        <file>ui/Components/AppCheckBox.qml</file>
+        <file>ui/Components/AppComboBox.qml</file>
+        <file>ui/Components/AppRadioButton.qml</file>
         <file>ui/Components/AppTextField.qml</file>
         <file>ui/Components/Avatar.qml</file>
         <file>ui/Components/ComponentPopup.qml</file>
