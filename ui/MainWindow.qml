@@ -12,6 +12,7 @@ Rectangle {
     property string activeChannelId: ""
     property string activeChannelType: ""
     property bool showSettings: false
+    property bool showServerSettings: false
     property bool showDirectMessages: false
     property string bannerMessage: ""
 
@@ -99,6 +100,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.bottom: parent.bottom
+        onServerSettingsRequested: root.showServerSettings = true
     }
 
     Loader {
@@ -144,6 +146,14 @@ Rectangle {
         color: Theme.background
         z: 10
         SettingsPage { onCloseRequested: root.showSettings = false }
+    }
+
+    Rectangle {
+        visible: root.showServerSettings
+        anchors.fill: parent
+        color: Theme.background
+        z: 15
+        ServerSettingsPage { onCloseRequested: root.showServerSettings = false }
     }
 
     ImageViewer {

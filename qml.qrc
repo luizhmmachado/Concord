@@ -15,6 +15,7 @@
         <file>ui/DirectMessagesView.qml</file>
         <file>ui/ServerInvitePopup.qml</file>
         <file>ui/SettingsPage.qml</file>
+        <file>ui/ServerSettingsPage.qml</file>
         <file>ui/Components/qmldir</file>
         <file>ui/Components/AppButton.qml</file>
         <file>ui/Components/AppCheckBox.qml</file>
@@ -22,6 +23,7 @@
         <file>ui/Components/AppRadioButton.qml</file>
         <file>ui/Components/AppTextField.qml</file>
         <file>ui/Components/Avatar.qml</file>
+        <file>ui/Components/ColorPickerDialog.qml</file>
         <file>ui/Components/ComponentPopup.qml</file>
         <file>ui/Components/ImagePickerDialog.qml</file>
         <file>ui/Components/ImageViewer.qml</file>

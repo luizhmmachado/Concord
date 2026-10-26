@@ -3,12 +3,14 @@ import QtQuick.Controls 2.15
 import "qrc:/style"
 import "qrc:/ui/Components"
 
-// Right column: online/offline members of the selected server, plus the role
-// manager for users that hold the manage_roles permission.
+// Right column: online/offline members of the selected server, plus the entry
+// point to the server settings page for users that manage roles or members.
 Rectangle {
     id: root
     width: 240
     color: Theme.surface
+
+    signal serverSettingsRequested()
 
     property string errorMessage: ""
 
@@ -54,19 +56,6 @@ Rectangle {
         serverMembers.setRoleAssigned(memberRolesDialog.memberUserId, roleId, assigned)
     }
 
-    function permissionSummary(permissions) {
-        if (!permissions)
-            return "Sem permiss\u00f5es"
-        var labels = []
-        if (permissions.manage_roles)
-            labels.push("cargos")
-        if (permissions.manage_channels)
-            labels.push("canais")
-        if (permissions.manage_members)
-            labels.push("membros")
-        return labels.length > 0 ? labels.join(", ") : "Sem permiss\u00f5es"
-    }
-
     Connections {
         target: serverController
         function onCurrentServerChanged() { serverMembers.watchServer(serverController.currentServerId) }
@@ -91,7 +80,8 @@ Rectangle {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - rolesButton.width - 12
+                width: parent.width
+                       - (settingsButton.visible ? settingsButton.width + parent.spacing : 0)
                 text: "MEMBROS"
                 color: Theme.textSecondary
                 font.bold: true
@@ -100,13 +90,13 @@ Rectangle {
             }
 
             AppButton {
-                id: rolesButton
-                visible: serverMembers.canManageRoles
-                text: "Cargos"
+                id: settingsButton
+                visible: serverMembers.canManageRoles || serverMembers.canManageMembers
+                text: "Configura\u00e7\u00f5es"
                 height: 28
                 implicitHeight: 28
                 baseColor: Theme.surfaceAlt
-                onClicked: roleManagerDialog.open()
+                onClicked: root.serverSettingsRequested()
             }
         }
 
@@ -204,139 +194,6 @@ Rectangle {
     }
 
     ComponentPopup {
-        id: roleManagerDialog
-        title: "Cargos do servidor"
-        width: 460
-        standardButtons: Dialog.Close
-
-        Column {
-            width: 420
-            spacing: 10
-
-            Text { text: "Cargos existentes"; color: Theme.textPrimary; font.bold: true }
-
-            Text {
-                visible: serverMembers.roleCount === 0
-                text: "Nenhum cargo criado ainda."
-                color: Theme.textSecondary
-                font.pixelSize: 11
-            }
-
-            Repeater {
-                model: serverMembers.roles
-                delegate: Rectangle {
-                    width: 420
-                    height: 38
-                    radius: Theme.radiusSmall
-                    color: Theme.surfaceAlt
-
-                    Row {
-                        anchors.fill: parent
-                        anchors.leftMargin: 8
-                        anchors.rightMargin: 8
-                        spacing: 8
-
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 12
-                            height: 12
-                            radius: 6
-                            color: model.color.length > 0 ? model.color : Theme.accent
-                        }
-
-                        Column {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width - 150
-                            spacing: 0
-
-                            Text {
-                                text: model.name
-                                color: Theme.textPrimary
-                                font.pixelSize: 12
-                                font.bold: true
-                                elide: Text.ElideRight
-                            }
-                            Text {
-                                text: root.permissionSummary(model.permissions)
-                                color: Theme.textSecondary
-                                font.pixelSize: 10
-                            }
-                        }
-
-                        AppButton {
-                            anchors.verticalCenter: parent.verticalCenter
-                            visible: serverMembers.canManageRoles
-                                     && serverMembers.canGrantPermissions(model.permissions)
-                            text: "Excluir"
-                            height: 26
-                            implicitHeight: 26
-                            baseColor: Theme.danger
-                            onClicked: serverMembers.deleteRole(model.roleId)
-                        }
-                    }
-                }
-            }
-
-            Rectangle { width: 420; height: 1; color: Qt.rgba(1, 1, 1, 0.08) }
-
-            Text { text: "Criar cargo"; color: Theme.textPrimary; font.bold: true }
-
-            Row {
-                spacing: 8
-
-                AppTextField {
-                    id: roleNameField
-                    width: 260
-                    placeholderText: "Nome do cargo"
-                }
-
-                AppTextField {
-                    id: roleColorField
-                    width: 150
-                    placeholderText: "#5865F2"
-                    text: "#5865F2"
-                }
-            }
-
-            Row {
-                spacing: 4
-
-                CheckBox {
-                    id: manageRolesCheck
-                    text: "Gerenciar cargos"
-                    palette.windowText: Theme.textPrimary
-                    enabled: serverMembers.canManageRoles
-                }
-                CheckBox {
-                    id: manageChannelsCheck
-                    text: "Gerenciar canais"
-                    palette.windowText: Theme.textPrimary
-                    enabled: serverMembers.canManageChannels
-                }
-                CheckBox {
-                    id: manageMembersCheck
-                    text: "Gerenciar membros"
-                    palette.windowText: Theme.textPrimary
-                    enabled: serverMembers.canManageMembers
-                }
-            }
-
-            AppButton {
-                text: "Criar cargo"
-                enabled: roleNameField.text.trim().length > 0 && serverMembers.canManageRoles
-                onClicked: {
-                    serverMembers.createRole(roleNameField.text, roleColorField.text, {
-                        "manage_roles": manageRolesCheck.checked,
-                        "manage_channels": manageChannelsCheck.checked,
-                        "manage_members": manageMembersCheck.checked
-                    })
-                    roleNameField.text = ""
-                }
-            }
-        }
-    }
-
-    ComponentPopup {
         id: memberRolesDialog
         width: 360
         standardButtons: Dialog.Close
@@ -372,10 +229,9 @@ Rectangle {
 
             Repeater {
                 model: serverMembers.canManageRoles ? serverMembers.roles : []
-                delegate: CheckBox {
+                delegate: AppCheckBox {
                     width: 320
                     text: model.name
-                    palette.windowText: Theme.textPrimary
                     enabled: serverMembers.canGrantPermissions(model.permissions)
                     checked: root.memberHasRole(memberRolesDialog.memberRoles, model.roleId)
                     onToggled: root.setMemberRole(model.roleId, checked)

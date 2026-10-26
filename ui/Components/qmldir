@@ -10,3 +10,4 @@ MemberListItem 1.0 MemberListItem.qml
 ImagePickerDialog 1.0 ImagePickerDialog.qml
 ImageViewer 1.0 ImageViewer.qml
 MessageImage 1.0 MessageImage.qml
+ColorPickerDialog 1.0 ColorPickerDialog.qml
