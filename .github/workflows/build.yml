@@ -162,31 +162,23 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $url = "https://slproweb.com/download/Win64OpenSSL-1_1_1w.exe"
-          $expected = "3fdcae7c00fd6bf20c7da32b6d22988cbf74eff1273e6dce22bd61a076381781"
-          $installer = Join-Path $env:RUNNER_TEMP "Win64OpenSSL-1_1_1w.exe"
-          Invoke-WebRequest -Uri $url -OutFile $installer -UseBasicParsing
-          $actual = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          $url = "https://download.firedaemon.com/FireDaemon-OpenSSL/openssl-1.1.1w.zip"
+          $expected = "1870b15bf6749e65ffbbadf52cdff3ee0e9f02943550bf4395574bb432af3eb8"
+          $archive = Join-Path $env:RUNNER_TEMP "openssl-1.1.1w.zip"
+          curl.exe -L --fail --retry 3 --retry-delay 5 --max-time 300 -o $archive $url
+          if ($LASTEXITCODE -ne 0) {
+            throw "OpenSSL download failed with exit code $LASTEXITCODE"
+          }
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actual -ne $expected) {
-            throw "OpenSSL installer checksum mismatch: $actual"
+            throw "OpenSSL archive checksum mismatch: $actual"
           }
           $dest = Join-Path $env:RUNNER_TEMP "openssl-1.1"
-          $arguments = @(
-            "/VERYSILENT",
-            "/SUPPRESSMSGBOXES",
-            "/NORESTART",
-            "/NOICONS",
-            "/SP-",
-            "/DIR=$dest"
-          )
-          $process = Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru
-          if ($process.ExitCode -ne 0) {
-            throw "OpenSSL installer failed with code $($process.ExitCode)"
-          }
-          $bin = Join-Path $dest "bin"
+          Expand-Archive -Path $archive -DestinationPath $dest -Force
+          $bin = Join-Path $dest "openssl-1.1\x64\bin"
           foreach ($name in @("libssl-1_1-x64.dll", "libcrypto-1_1-x64.dll")) {
             if (-not (Test-Path (Join-Path $bin $name))) {
-              throw "OpenSSL runtime $name was not installed"
+              throw "OpenSSL runtime $name was not found"
             }
           }
           "OPENSSL_1_1_DIR=$bin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
