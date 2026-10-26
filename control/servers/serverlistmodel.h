@@ -10,14 +10,13 @@ struct ServerEntry {
     QString name;
     QString iconUrl;
     QString ownerId;
-    QString inviteCode;
 };
 
 class ServerListModel : public QAbstractListModel
 {
     Q_OBJECT
 public:
-    enum Roles { IdRole = Qt::UserRole + 1, NameRole, IconUrlRole, OwnerIdRole, InviteCodeRole };
+    enum Roles { IdRole = Qt::UserRole + 1, NameRole, IconUrlRole, OwnerIdRole };
 
     explicit ServerListModel(QObject *parent = nullptr);
 

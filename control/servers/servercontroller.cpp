@@ -22,8 +22,8 @@ ServerController::ServerController(SupabaseClient *client, RealtimeClient *realt
                     flattened.append(server);
             }
             m_servers.setServers(flattened);
-            // The invite code / name of the selected server only become known
-            // once the list arrives.
+            // The selected server's name only becomes known once the list
+            // arrives.
             emit currentServerChanged();
         } else if (tag == "channels:list") {
             if (!ok) {
@@ -35,15 +35,34 @@ ServerController::ServerController(SupabaseClient *client, RealtimeClient *realt
     });
 
     connect(m_client, &SupabaseClient::rpcFinished, this, [this](const QString &tag, bool ok, const QJsonValue &result, const QString &error) {
-        if (tag != "servers:joinInvite")
-            return;
-        if (!ok || !result.isString()) {
-            const QString reason = QJsonDocument::fromJson(error.toUtf8()).object().value("message").toString();
-            emit errorOccurred(reason.isEmpty() ? QStringLiteral("Convite inv\u00e1lido") : reason);
+        if (tag == QStringLiteral("servers:joinInvite")) {
+            if (!ok || !result.isString()) {
+                const QString reason = QJsonDocument::fromJson(error.toUtf8()).object().value("message").toString();
+                emit errorOccurred(reason.isEmpty() ? QStringLiteral("Convite inv\u00e1lido") : reason);
+                return;
+            }
+            emit serverJoined(result.toString());
+            loadServers(m_userId);
             return;
         }
-        emit serverJoined(result.toString());
-        loadServers(m_userId);
+
+        const QString invitePrefix = QStringLiteral("servers:inviteCode:");
+        if (!tag.startsWith(invitePrefix))
+            return;
+
+        const QString requestServerId = tag.mid(invitePrefix.size());
+        if (requestServerId != m_currentServerId)
+            return;
+
+        setInviteCodeLoading(false);
+        if (!ok || !result.isString()) {
+            const QString reason = QJsonDocument::fromJson(error.toUtf8()).object().value("message").toString();
+            emit errorOccurred(reason.isEmpty() ? QStringLiteral("N\u00e3o foi poss\u00edvel gerar o convite") : reason);
+            return;
+        }
+
+        m_currentInviteCode = result.toString();
+        emit currentServerInviteChanged();
     });
 
     connect(m_client, &SupabaseClient::insertFinished, this, [this](const QString &tag, bool ok, const QJsonArray &rows, const QString &error) {
@@ -71,13 +90,19 @@ void ServerController::loadServers(const QString &userId)
 {
     qInfo().noquote() << "ServerController::loadServers" << "userId=" << userId;
     m_userId = userId;
-    m_client->select(QStringLiteral("server_members?user_id=eq.%1&select=servers(*)").arg(userId), "servers:list");
+    m_client->select(QStringLiteral("server_members?user_id=eq.%1&select=servers(id,name,icon_url,owner_id)").arg(userId), "servers:list");
 }
 
 void ServerController::selectServer(const QString &serverId)
 {
     qInfo().noquote() << "ServerController::selectServer" << "serverId=" << serverId;
+    const bool changed = serverId != m_currentServerId;
     m_currentServerId = serverId;
+    if (changed) {
+        m_currentInviteCode.clear();
+        setInviteCodeLoading(false);
+        emit currentServerInviteChanged();
+    }
     emit currentServerChanged();
     m_client->select(QStringLiteral("channels?server_id=eq.%1&select=*&order=position.asc").arg(serverId), "channels:list");
 }
@@ -90,7 +115,7 @@ void ServerController::createServer(const QString &name)
 
 void ServerController::joinServerByInviteCode(const QString &inviteCode)
 {
-    qInfo().noquote() << "ServerController::joinServerByInviteCode" << "inviteCode=" << inviteCode;
+    qInfo().noquote() << "ServerController::joinServerByInviteCode";
     // RLS only exposes servers to their members, so a non-member cannot resolve
     // the invite code directly; a SECURITY DEFINER function does it instead.
     QString code = inviteCode.trimmed();
@@ -110,9 +135,29 @@ QString ServerController::currentServerName() const
 
 QString ServerController::currentServerInviteCode() const
 {
-    qInfo().noquote() << "ServerController::currentServerInviteCode";
-    const ServerEntry *entry = m_servers.serverById(m_currentServerId);
-    return entry ? entry->inviteCode : QString();
+    return m_currentInviteCode;
+}
+
+void ServerController::requestInviteCode()
+{
+    qInfo().noquote() << "ServerController::requestInviteCode" << "serverId=" << m_currentServerId;
+    if (m_currentServerId.isEmpty())
+        return;
+
+    m_currentInviteCode.clear();
+    emit currentServerInviteChanged();
+    setInviteCodeLoading(true);
+    m_client->rpc(QStringLiteral("create_server_invite"),
+                  QJsonObject{{"p_server_id", m_currentServerId}},
+                  QStringLiteral("servers:inviteCode:%1").arg(m_currentServerId));
+}
+
+void ServerController::setInviteCodeLoading(bool loading)
+{
+    if (loading == m_inviteCodeLoading)
+        return;
+    m_inviteCodeLoading = loading;
+    emit inviteCodeLoadingChanged();
 }
 
 void ServerController::createChannel(const QString &serverId, const QString &name, const QString &type)

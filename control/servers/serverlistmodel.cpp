@@ -27,7 +27,6 @@ QVariant ServerListModel::data(const QModelIndex &index, int role) const
     case NameRole: return entry.name;
     case IconUrlRole: return entry.iconUrl;
     case OwnerIdRole: return entry.ownerId;
-    case InviteCodeRole: return entry.inviteCode;
     default: return {};
     }
 }
@@ -40,7 +39,6 @@ QHash<int, QByteArray> ServerListModel::roleNames() const
         {NameRole, "name"},
         {IconUrlRole, "iconUrl"},
         {OwnerIdRole, "ownerId"},
-        {InviteCodeRole, "inviteCode"},
     };
 }
 
@@ -56,7 +54,6 @@ void ServerListModel::setServers(const QJsonArray &rows)
             obj.value("name").toString(),
             obj.value("icon_url").toString(),
             obj.value("owner_id").toString(),
-            obj.value("invite_code").toString(),
         });
     }
     endResetModel();
@@ -80,7 +77,6 @@ void ServerListModel::upsertServer(const QJsonObject &row)
         row.value("name").toString(),
         row.value("icon_url").toString(),
         row.value("owner_id").toString(),
-        row.value("invite_code").toString(),
     });
     endInsertRows();
 }
