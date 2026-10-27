@@ -225,15 +225,12 @@ void CallMediaEngine::stop()
 
 void CallMediaEngine::selectPad(GstElement *selector, GstPad *pad)
 {
-    qInfo().noquote() << "CallMediaEngine::selectPad" << "selector=" << selector << "pad=" << pad;
     if (selector && pad)
         g_object_set(selector, "active-pad", pad, nullptr);
 }
 
 GstElement *CallMediaEngine::addLiveSource(const QString &description, GstElement *selector, GstElement **)
 {
-    qInfo() << "[media] abrindo fonte:" << description;
-
     GError *error = nullptr;
     GstElement *bin = gst_parse_bin_from_description(description.toUtf8().constData(), TRUE, &error);
     if (!bin || error) {
@@ -249,6 +246,8 @@ GstElement *CallMediaEngine::addLiveSource(const QString &description, GstElemen
     gst_bin_add(GST_BIN(m_pipeline), bin);
 
     GstPad *selectorPad = gst_element_get_request_pad(selector, "sink_%u");
+    if (selectorPad && g_object_class_find_property(G_OBJECT_GET_CLASS(selectorPad), "always-ok"))
+        g_object_set(selectorPad, "always-ok", TRUE, nullptr);
     GstPad *srcPad = gst_element_get_static_pad(bin, "src");
     const bool linked = srcPad && selectorPad && gst_pad_link(srcPad, selectorPad) == GST_PAD_LINK_OK;
     if (srcPad)
@@ -265,9 +264,21 @@ GstElement *CallMediaEngine::addLiveSource(const QString &description, GstElemen
         return nullptr;
     }
 
-    const gboolean synced = gst_element_sync_state_with_parent(bin);
+    // Select before starting the live source. Otherwise its first buffer can
+    // reach an inactive input-selector pad, get GST_FLOW_NOT_LINKED, and stop
+    // producing frames before we have a chance to switch to it.
     selectPad(selector, selectorPad);
-    qInfo() << "[media] fonte ativa, sync_state ->" << (synced ? "ok" : "falhou");
+    const gboolean synced = gst_element_sync_state_with_parent(bin);
+    if (!synced) {
+        qWarning() << "[media] falha ao iniciar a fonte de vídeo";
+        selectPad(selector, selector == m_cameraSelector ? m_cameraBlackPad : m_screenBlackPad);
+        gst_element_release_request_pad(selector, selectorPad);
+        gst_object_unref(selectorPad);
+        gst_element_set_state(bin, GST_STATE_NULL);
+        gst_bin_remove(GST_BIN(m_pipeline), bin);
+        emit errorOccurred(QStringLiteral("Não foi possível iniciar a fonte de vídeo"));
+        return nullptr;
+    }
 
     if (selector == m_cameraSelector)
         m_cameraLivePad = selectorPad;
@@ -279,29 +290,29 @@ GstElement *CallMediaEngine::addLiveSource(const QString &description, GstElemen
 
 void CallMediaEngine::removeLiveSource(GstElement **source, GstElement *selector, GstPad **pad)
 {
-    qInfo().noquote() << "CallMediaEngine::removeLiveSource" << "source=" << source << "selector=" << selector << "pad=" << pad;
     if (!*source)
         return;
 
     // Point the selector back at the black filler before tearing the source down.
     selectPad(selector, selector == m_cameraSelector ? m_cameraBlackPad : m_screenBlackPad);
 
-    gst_element_set_state(*source, GST_STATE_NULL);
-    gst_bin_remove(GST_BIN(m_pipeline), *source);
-    *source = nullptr;
-
+    // Unlink the source before stopping it. If its streaming thread is blocked
+    // pushing into the now-inactive selector pad, stopping first would wait on
+    // that thread forever and freeze the GUI.
     if (*pad) {
         gst_element_release_request_pad(selector, *pad);
         gst_object_unref(*pad);
         *pad = nullptr;
     }
+
+    gst_element_set_state(*source, GST_STATE_NULL);
+    gst_bin_remove(GST_BIN(m_pipeline), *source);
+    *source = nullptr;
 }
 
 void CallMediaEngine::setCameraEnabled(bool enabled)
 {
-    qInfo().noquote() << "CallMediaEngine::setCameraEnabled" << "enabled=" << enabled;
     m_cameraEnabled = enabled;
-    qInfo() << "[media] setCameraEnabled" << enabled << "pipeline" << (m_pipeline != nullptr);
     if (!m_pipeline)
         return;
 
@@ -309,21 +320,25 @@ void CallMediaEngine::setCameraEnabled(bool enabled)
         if (m_cameraSource)
             return;
         const QString desc = QStringLiteral(
-                                 "%1 ! videoconvert ! videoscale ! videorate ! "
+                                 "%1 ! queue max-size-buffers=1 leaky=downstream ! "
+                                 "videoconvert ! videoscale ! videorate ! "
                                  "video/x-raw,width=640,height=480,framerate=15/1 ! videoconvert")
                                  .arg(QString::fromUtf8(kCameraSrc));
         m_cameraSource = addLiveSource(desc, m_cameraSelector, nullptr);
+        if (m_cameraSource)
+            qInfo() << "[media] Câmera ligada";
     } else {
+        if (!m_cameraSource)
+            return;
         removeLiveSource(&m_cameraSource, m_cameraSelector, &m_cameraLivePad);
         m_cameraPreview->clear();
+        qInfo() << "[media] Câmera desligada";
     }
 }
 
 void CallMediaEngine::setScreenSharingEnabled(bool enabled)
 {
-    qInfo().noquote() << "CallMediaEngine::setScreenSharingEnabled" << "enabled=" << enabled;
     m_screenSharing = enabled;
-    qInfo() << "[media] setScreenSharingEnabled" << enabled << "pipeline" << (m_pipeline != nullptr);
     if (!m_pipeline)
         return;
 
@@ -335,7 +350,8 @@ void CallMediaEngine::setScreenSharingEnabled(bool enabled)
                                     : m_screenCaptureDescription;
         // Only the height is pinned so videoscale keeps the source aspect ratio.
         const QString desc = QStringLiteral(
-                                 "%1 ! videoconvert ! videorate drop-only=true ! "
+                                 "%1 ! queue max-size-buffers=1 leaky=downstream ! "
+                                 "videoconvert ! videorate drop-only=true ! "
                                  "video/x-raw,framerate=%3/1 ! videoscale add-borders=false ! "
                                  "video/x-raw,height=%2,pixel-aspect-ratio=1/1 ! videoconvert")
                                  .arg(capture)
@@ -350,7 +366,6 @@ void CallMediaEngine::setScreenSharingEnabled(bool enabled)
 
 void CallMediaEngine::setMicMuted(bool muted)
 {
-    qInfo().noquote() << "CallMediaEngine::setMicMuted" << "muted=" << muted;
     m_micMuted = muted;
     if (m_micVolume)
         g_object_set(m_micVolume, "mute", muted ? TRUE : FALSE, nullptr);
@@ -593,7 +608,6 @@ void CallMediaEngine::setScreenSharingEnabled(bool enabled)
 }
 void CallMediaEngine::setMicMuted(bool muted)
 {
-    qInfo().noquote() << "CallMediaEngine::setMicMuted" << "muted=" << muted;
     m_micMuted = muted;
 }
 

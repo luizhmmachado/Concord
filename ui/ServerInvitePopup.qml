@@ -51,10 +51,11 @@ ComponentPopup {
                 elide: Text.ElideRight
             }
 
-            Text {
-                text: "\u2715"
+            AppIcon {
+                Layout.alignment: Qt.AlignVCenter
+                name: "close"
+                size: 18
                 color: Theme.textSecondary
-                font.pixelSize: 18
                 MouseArea { anchors.fill: parent; onClicked: root.close() }
             }
         }

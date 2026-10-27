@@ -240,8 +240,8 @@ Rectangle {
                             anchors.right: parent.right
                             anchors.margins: 8
                             spacing: 4
-                            Text { visible: participantCell.muted; text: "🔇"; font.pixelSize: 11 }
-                            Text { visible: participantCell.screenSharing; text: "🖥"; color: Theme.accent; font.pixelSize: 11 }
+                            AppIcon { visible: participantCell.muted; name: "mic-off"; size: 11; color: Theme.textPrimary }
+                            AppIcon { visible: participantCell.screenSharing; name: "screen-share-on"; size: 11; color: Theme.accent }
                         }
 
                         Text {
@@ -267,17 +267,20 @@ Rectangle {
         spacing: 12
 
         AppButton {
-            text: callController.micMuted ? "🔇 Desmutar" : "🎙 Mutar"
+            text: callController.micMuted ? "Desmutar" : "Mutar"
+            iconName: callController.micMuted ? "mic-off" : "mic-on"
             baseColor: callController.micMuted ? Theme.danger : Theme.surface
             onClicked: callController.toggleMicMuted()
         }
         AppButton {
-            text: callController.cameraEnabled ? "📷 Desligar câmera" : "📷 Ligar câmera"
+            text: callController.cameraEnabled ? "Desligar câmera" : "Ligar câmera"
+            iconName: callController.cameraEnabled ? "camera-off" : "camera-on"
             baseColor: callController.cameraEnabled ? Theme.accent : Theme.surface
             onClicked: callController.toggleCamera()
         }
         AppButton {
-            text: callController.screenSharing ? "🖥 Parar transmissão" : "🖥 Transmitir tela"
+            text: callController.screenSharing ? "Parar transmissão" : "Transmitir tela"
+            iconName: callController.screenSharing ? "screen-share-off" : "screen-share-on"
             baseColor: callController.screenSharing ? Theme.accent : Theme.surface
             onClicked: {
                 if (callController.screenSharing) {
@@ -289,7 +292,8 @@ Rectangle {
             }
         }
         AppButton {
-            text: "📞 Sair"
+            text: "Sair"
+            iconName: "call-hangup"
             baseColor: Theme.danger
             onClicked: callController.leaveCall()
         }
@@ -355,10 +359,11 @@ Rectangle {
                         anchors.rightMargin: 12
                         spacing: 10
 
-                        Text {
+                        AppIcon {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: isWindow ? "🪟" : "🖥"
-                            font.pixelSize: 18
+                            name: isWindow ? "source-window" : "source-screen"
+                            size: 18
+                            color: sourcePicker.selectedIndex === index ? "white" : Theme.textPrimary
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter

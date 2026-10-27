@@ -15,6 +15,7 @@ class MediaDeviceController : public QObject
     Q_PROPERTY(QStringList microphones READ microphones NOTIFY devicesChanged)
     Q_PROPERTY(QStringList speakers READ speakers NOTIFY devicesChanged)
     Q_PROPERTY(QStringList cameras READ cameras NOTIFY devicesChanged)
+    Q_PROPERTY(QStringList cameraDeviceIds READ cameraDeviceIds NOTIFY devicesChanged)
 
 public:
     explicit MediaDeviceController(QObject *parent = nullptr);
@@ -23,6 +24,7 @@ public:
     QStringList microphones() const { return m_microphones; }
     QStringList speakers() const { return m_speakers; }
     QStringList cameras() const { return m_cameras; }
+    QStringList cameraDeviceIds() const { return m_cameraDeviceIds; }
 
     Q_INVOKABLE void refresh();
 
@@ -33,6 +35,7 @@ private:
     QStringList m_microphones;
     QStringList m_speakers;
     QStringList m_cameras;
+    QStringList m_cameraDeviceIds;
 };
 
 #endif // MEDIADEVICECONTROLLER_H

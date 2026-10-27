@@ -1,15 +1,12 @@
 #include "callparticipantmodel.h"
 
-#include <QDebug>
 CallParticipantModel::CallParticipantModel(QObject *parent)
     : QAbstractListModel(parent)
 {
-    qInfo().noquote() << "CallParticipantModel::CallParticipantModel";
 }
 
 int CallParticipantModel::indexOf(const QString &userId) const
 {
-    qInfo().noquote() << "CallParticipantModel::indexOf" << "userId=" << userId;
     for (int i = 0; i < m_participants.size(); ++i) {
         if (m_participants.at(i).userId == userId)
             return i;
@@ -19,7 +16,6 @@ int CallParticipantModel::indexOf(const QString &userId) const
 
 int CallParticipantModel::rowCount(const QModelIndex &parent) const
 {
-    qInfo().noquote() << "CallParticipantModel::rowCount";
     if (parent.isValid())
         return 0;
     return m_participants.size();
@@ -27,7 +23,6 @@ int CallParticipantModel::rowCount(const QModelIndex &parent) const
 
 QVariant CallParticipantModel::data(const QModelIndex &index, int role) const
 {
-    qInfo().noquote() << "CallParticipantModel::data" << "index=" << index << "role=" << role;
     if (!index.isValid() || index.row() >= m_participants.size())
         return {};
 
@@ -47,7 +42,6 @@ QVariant CallParticipantModel::data(const QModelIndex &index, int role) const
 
 QHash<int, QByteArray> CallParticipantModel::roleNames() const
 {
-    qInfo().noquote() << "CallParticipantModel::roleNames";
     return {
         {UserIdRole, "userId"},
         {DisplayNameRole, "displayName"},
@@ -62,7 +56,6 @@ QHash<int, QByteArray> CallParticipantModel::roleNames() const
 
 void CallParticipantModel::addParticipant(const QString &userId, const QString &displayName)
 {
-    qInfo().noquote() << "CallParticipantModel::addParticipant" << "userId=" << userId << "displayName=" << displayName;
     if (indexOf(userId) >= 0)
         return;
     beginInsertRows(QModelIndex(), m_participants.size(), m_participants.size());
@@ -76,7 +69,6 @@ void CallParticipantModel::addParticipant(const QString &userId, const QString &
 
 void CallParticipantModel::setDisplayName(const QString &userId, const QString &displayName)
 {
-    qInfo().noquote() << "CallParticipantModel::setDisplayName" << "userId=" << userId << "displayName=" << displayName;
     const int row = indexOf(userId);
     if (row < 0 || displayName.isEmpty() || m_participants.at(row).displayName == displayName)
         return;
@@ -86,7 +78,6 @@ void CallParticipantModel::setDisplayName(const QString &userId, const QString &
 
 void CallParticipantModel::removeParticipant(const QString &userId)
 {
-    qInfo().noquote() << "CallParticipantModel::removeParticipant" << "userId=" << userId;
     const int row = indexOf(userId);
     if (row < 0)
         return;
@@ -98,7 +89,6 @@ void CallParticipantModel::removeParticipant(const QString &userId)
 
 void CallParticipantModel::setConnectionState(const QString &userId, const QString &state)
 {
-    qInfo().noquote() << "CallParticipantModel::setConnectionState" << "userId=" << userId << "state=" << state;
     const int row = indexOf(userId);
     if (row < 0)
         return;
@@ -108,7 +98,6 @@ void CallParticipantModel::setConnectionState(const QString &userId, const QStri
 
 void CallParticipantModel::setMuted(const QString &userId, bool muted)
 {
-    qInfo().noquote() << "CallParticipantModel::setMuted" << "userId=" << userId << "muted=" << muted;
     const int row = indexOf(userId);
     if (row < 0)
         return;
@@ -118,7 +107,6 @@ void CallParticipantModel::setMuted(const QString &userId, bool muted)
 
 void CallParticipantModel::setCameraOn(const QString &userId, bool cameraOn)
 {
-    qInfo().noquote() << "CallParticipantModel::setCameraOn" << "userId=" << userId << "cameraOn=" << cameraOn;
     const int row = indexOf(userId);
     if (row < 0)
         return;
@@ -128,7 +116,6 @@ void CallParticipantModel::setCameraOn(const QString &userId, bool cameraOn)
 
 void CallParticipantModel::setScreenSharing(const QString &userId, bool sharing)
 {
-    qInfo().noquote() << "CallParticipantModel::setScreenSharing" << "userId=" << userId << "sharing=" << sharing;
     const int row = indexOf(userId);
     if (row < 0)
         return;
@@ -138,7 +125,6 @@ void CallParticipantModel::setScreenSharing(const QString &userId, bool sharing)
 
 void CallParticipantModel::setVideoSource(const QString &userId, QObject *source)
 {
-    qInfo().noquote() << "CallParticipantModel::setVideoSource" << "userId=" << userId << "source=" << source;
     const int row = indexOf(userId);
     if (row < 0)
         return;
@@ -148,7 +134,6 @@ void CallParticipantModel::setVideoSource(const QString &userId, QObject *source
 
 void CallParticipantModel::setScreenSource(const QString &userId, QObject *source)
 {
-    qInfo().noquote() << "CallParticipantModel::setScreenSource" << "userId=" << userId << "source=" << source;
     const int row = indexOf(userId);
     if (row < 0)
         return;
@@ -158,14 +143,12 @@ void CallParticipantModel::setScreenSource(const QString &userId, QObject *sourc
 
 bool CallParticipantModel::isScreenSharing(const QString &userId) const
 {
-    qInfo().noquote() << "CallParticipantModel::isScreenSharing" << "userId=" << userId;
     const int row = indexOf(userId);
     return row >= 0 && m_participants.at(row).screenSharing;
 }
 
 void CallParticipantModel::clear()
 {
-    qInfo().noquote() << "CallParticipantModel::clear";
     beginResetModel();
     m_participants.clear();
     endResetModel();

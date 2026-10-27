@@ -42,7 +42,9 @@ Rectangle {
             visible: serverController.currentServerId.length > 0
                      && serverMembers.currentServerId === serverController.currentServerId
                      && serverMembers.canInvite
-            text: "\u2795 Convidar pessoas"
+            text: "Convidar pessoas"
+            iconName: "user-plus"
+            iconSize: 16
             baseColor: Theme.accent
             onClicked: serverInvitePopup.open()
         }
@@ -67,16 +69,20 @@ Rectangle {
                         anchors.rightMargin: 8
                         spacing: 6
 
-                        Text { 
-                            text: type === "voice" ? "🔊" : "#"
+                        AppIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            name: type === "voice" ? "channel-voice" : "channel-text"
+                            size: 14
                             color: (type === "voice" && callController.inCall && callController.callChannelId === channelId) ? Theme.accent : Theme.textSecondary
                         }
                         Text { 
+                            anchors.verticalCenter: parent.verticalCenter
                             text: name
                             color: Theme.textPrimary
                             elide: Text.ElideRight
                         }
                         Text {
+                            anchors.verticalCenter: parent.verticalCenter
                             visible: type === "voice" && root.participantsIn(channelId).length > 0
                             text: "(" + root.participantsIn(channelId).length + ")"
                             color: Theme.online
@@ -112,13 +118,15 @@ Rectangle {
                             anchors.rightMargin: 8
                             spacing: 6
 
-                            Text {
-                                text: "\u25cf"
+                            AppIcon {
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: "status-online"
+                                size: 14
                                 color: Theme.online
-                                font.pixelSize: 14
                             }
 
                             Text {
+                                anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.displayName
                                 color: Theme.textPrimary
                                 font.pixelSize: 11
@@ -126,23 +134,25 @@ Rectangle {
                             }
 
                             Row {
+                                anchors.verticalCenter: parent.verticalCenter
                                 spacing: 3
-                                Text {
+                                AppIcon {
                                     visible: modelData.muted
-                                    text: "\ud83d\udd07"
-                                    font.pixelSize: 9
+                                    name: "mic-off-16"
+                                    size: 9
+                                    color: Theme.textSecondary
                                 }
-                                Text {
+                                AppIcon {
                                     visible: modelData.cameraOn
-                                    text: "\ud83d\udcf7"
+                                    name: "camera-on-16"
+                                    size: 9
                                     color: Theme.accent
-                                    font.pixelSize: 9
                                 }
-                                Text {
+                                AppIcon {
                                     visible: modelData.screenSharing
-                                    text: "\ud83d\udda5"
+                                    name: "screen-share-on-16"
+                                    size: 9
                                     color: Theme.accent
-                                    font.pixelSize: 9
                                 }
                             }
                         }
@@ -152,7 +162,9 @@ Rectangle {
         }
 
         AppButton {
-            text: "+ Canal"
+            text: "Canal"
+            iconName: "plus"
+            iconSize: 16
             visible: serverController.currentServerId.length > 0 && serverMembers.canManageChannels
             baseColor: Theme.surfaceAlt
             onClicked: createChannelDialog.open()

@@ -2,6 +2,7 @@ module Concord.UI.Components
 AppButton 1.0 AppButton.qml
 AppCheckBox 1.0 AppCheckBox.qml
 AppComboBox 1.0 AppComboBox.qml
+AppIcon 1.0 AppIcon.qml
 AppRadioButton 1.0 AppRadioButton.qml
 AppTextField 1.0 AppTextField.qml
 Avatar 1.0 Avatar.qml

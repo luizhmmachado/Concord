@@ -50,12 +50,13 @@ Rectangle {
             color: "white"
             wrapMode: Text.WordWrap
         }
-        Text {
+        AppIcon {
             id: closeBanner
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.margins: 8
-            text: "\u2715"
+            name: "close"
+            size: 14
             color: "white"
             MouseArea { anchors.fill: parent; onClicked: root.bannerMessage = "" }
         }

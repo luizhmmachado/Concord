@@ -25,8 +25,6 @@ VideoStreamSource::~VideoStreamSource()
 
 void VideoStreamSource::setVideoSurface(QAbstractVideoSurface *surface)
 {
-    qInfo().noquote() << "VideoStreamSource::setVideoSurface" << "surface=" << surface;
-    qInfo() << "[video]" << objectName() << "setVideoSurface" << surface;
     if (m_surface == surface)
         return;
     stopSurface();
@@ -36,14 +34,12 @@ void VideoStreamSource::setVideoSurface(QAbstractVideoSurface *surface)
 
 void VideoStreamSource::stopSurface()
 {
-    qInfo().noquote() << "VideoStreamSource::stopSurface";
     if (m_surface && m_surface->isActive())
         m_surface->stop();
 }
 
 void VideoStreamSource::clear()
 {
-    qInfo().noquote() << "VideoStreamSource::clear";
     stopSurface();
     m_currentSize = QSize();
     emit frameSizeChanged();
@@ -55,22 +51,11 @@ void VideoStreamSource::clear()
 
 void VideoStreamSource::pushFrame(const QImage &image)
 {
-    qInfo().noquote() << "VideoStreamSource::pushFrame" << "image=" << image;
     QMetaObject::invokeMethod(this, "renderFrame", Qt::QueuedConnection, Q_ARG(QImage, image));
-}
-
-void VideoStreamSource::noteSample(int width, int height)
-{
-    qInfo().noquote() << "VideoStreamSource::noteSample" << "width=" << width << "height=" << height;
-    if (m_loggedFirstSample)
-        return;
-    m_loggedFirstSample = true;
-    qInfo() << "[video]" << objectName() << "primeiro sample do GStreamer" << width << "x" << height;
 }
 
 void VideoStreamSource::renderFrame(const QImage &image)
 {
-    qInfo().noquote() << "VideoStreamSource::renderFrame" << "image=" << image;
     if (!m_surface) {
         if (!m_warnedNoSurface) {
             m_warnedNoSurface = true;
@@ -89,7 +74,6 @@ void VideoStreamSource::renderFrame(const QImage &image)
                        << m_surface->error();
             return;
         }
-        qInfo() << "[video]" << objectName() << "surface iniciada" << image.size();
         m_currentSize = image.size();
         emit frameSizeChanged();
     }
@@ -98,7 +82,6 @@ void VideoStreamSource::renderFrame(const QImage &image)
 
     if (!m_hasFrames) {
         m_hasFrames = true;
-        qInfo() << "[video]" << objectName() << "primeiro frame apresentado";
         emit hasFramesChanged();
     }
 }
@@ -128,7 +111,6 @@ GstFlowReturn onNewSample(GstElement *sink, gpointer userData)
         const int stride = GST_VIDEO_INFO_PLANE_STRIDE(&info, 0);
         // BGRA in memory order matches Qt's Format_RGB32 on little-endian.
         const QImage frame(map.data, info.width, info.height, stride, QImage::Format_RGB32);
-        target->noteSample(info.width, info.height);
         target->pushFrame(frame.copy());
         gst_buffer_unmap(buffer, &map);
     }
@@ -144,7 +126,11 @@ void attachAppSinkToVideoSource(GstElement *appsink, VideoStreamSource *target)
     if (!appsink || !target)
         return;
     qInfo() << "[video] appsink ligado a" << target->objectName();
-    g_object_set(appsink, "emit-signals", TRUE, "sync", FALSE, "max-buffers", 1, "drop", TRUE, nullptr);
+    // The screen preview sink sits behind a closed valve at startup. Without
+    // async=false it never prerolls, keeping the whole pipeline in PAUSED and
+    // preventing the camera branch from producing frames.
+    g_object_set(appsink, "emit-signals", TRUE, "sync", FALSE, "async", FALSE,
+                 "max-buffers", 1, "drop", TRUE, nullptr);
     g_signal_connect(appsink, "new-sample", G_CALLBACK(onNewSample), target);
 }
 

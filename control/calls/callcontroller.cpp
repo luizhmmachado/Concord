@@ -274,7 +274,6 @@ QObject *CallController::activeScreenSource()
 
 void CallController::updateActiveScreen()
 {
-    qInfo().noquote() << "CallController::updateActiveScreen";
     QString owner;
     if (m_screenSharing) {
         owner = m_localParticipantId;
@@ -295,7 +294,6 @@ void CallController::updateActiveScreen()
 
 void CallController::applyLocalStateToAllPeers()
 {
-    qInfo().noquote() << "CallController::applyLocalStateToAllPeers";
     m_media.setMicMuted(m_micMuted);
     m_media.setCameraEnabled(m_cameraEnabled);
     m_media.setScreenSharingEnabled(m_screenSharing);
@@ -307,7 +305,6 @@ void CallController::applyLocalStateToAllPeers()
 
 void CallController::updateLocalParticipantState()
 {
-    qInfo().noquote() << "CallController::updateLocalParticipantState";
     if (m_localParticipantId.isEmpty())
         return;
     m_participants.setMuted(m_localParticipantId, m_micMuted);
@@ -317,7 +314,6 @@ void CallController::updateLocalParticipantState()
 
 void CallController::broadcastLocalState()
 {
-    qInfo().noquote() << "CallController::broadcastLocalState";
     if (m_signalingTopic.isEmpty())
         return;
     m_realtime->broadcast(m_signalingTopic, "state",
@@ -339,7 +335,6 @@ void CallController::toggleMicMuted()
 
 void CallController::toggleCamera()
 {
-    qInfo().noquote() << "CallController::toggleCamera";
     m_cameraEnabled = !m_cameraEnabled;
     applyLocalStateToAllPeers();
     broadcastLocalState();

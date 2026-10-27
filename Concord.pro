@@ -72,7 +72,8 @@ HEADERS += \
     control/calls/mediadevicecontroller.h
 
 RESOURCES += \
-    qml.qrc
+    qml.qrc \
+    assets/icons/icons.qrc
 
 INCLUDEPATH += $$PWD
 

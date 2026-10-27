@@ -34,9 +34,6 @@ public:
     // to the surface on the GUI thread.
     void pushFrame(const QImage &image);
 
-    // Diagnostics: logs the first sample seen on the streaming thread.
-    void noteSample(int width, int height);
-
     void clear();
 
 signals:
@@ -53,7 +50,6 @@ private:
     QSize m_currentSize;
     bool m_hasFrames = false;
     bool m_warnedNoSurface = false;
-    bool m_loggedFirstSample = false;
 };
 
 #if CONCORD_HAS_GSTREAMER

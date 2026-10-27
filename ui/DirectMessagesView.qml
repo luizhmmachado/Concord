@@ -34,7 +34,9 @@ Rectangle {
 
             AppButton {
                 Layout.fillWidth: true
-                text: "+ Adicionar amigo"
+                text: "Adicionar amigo"
+                iconName: "user-plus"
+                iconSize: 16
                 baseColor: Theme.surfaceAlt
                 onClicked: addFriendDialog.open()
             }

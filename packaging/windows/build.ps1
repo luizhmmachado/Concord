@@ -93,6 +93,19 @@ if (-not (Test-Path $offscreenPlugin)) {
 }
 Copy-Item $offscreenPlugin (Join-Path $distPath "platforms") -Force
 
+# Qt's SVG image format plugin renders the bundled interface icons.
+$svgPlugin = Join-Path $qtPlugins "imageformats\qsvg.dll"
+$svgDll = Join-Path $qtBin "Qt5Svg.dll"
+if (-not (Test-Path $svgPlugin)) {
+    throw "qsvg image format plugin not found at $svgPlugin"
+}
+if (-not (Test-Path $svgDll)) {
+    throw "Qt5Svg.dll not found at $svgDll"
+}
+New-Item -ItemType Directory -Force (Join-Path $distPath "imageformats") | Out-Null
+Copy-Item $svgPlugin (Join-Path $distPath "imageformats") -Force
+Copy-Item $svgDll $distPath -Force
+
 Copy-Item "$GStreamerRoot\bin\*.dll" $distPath -Force
 $pluginDir = Join-Path $distPath "lib\gstreamer-1.0"
 $scannerDir = Join-Path $distPath "libexec\gstreamer-1.0"

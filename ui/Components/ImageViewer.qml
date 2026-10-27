@@ -165,14 +165,18 @@ Rectangle {
                 onClicked: root.resetView()
             }
             AppButton {
-                text: "\u2212"
+                text: ""
+                iconName: "minus"
+                iconSize: 14
                 baseColor: Theme.surfaceAlt
                 textColor: Theme.textPrimary
                 enabled: root.zoom > 0.2501
                 onClicked: root.zoomBy(1 / 1.15)
             }
             AppButton {
-                text: "+"
+                text: ""
+                iconName: "plus"
+                iconSize: 14
                 baseColor: Theme.surfaceAlt
                 textColor: Theme.textPrimary
                 enabled: root.zoom < 4.999

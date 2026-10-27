@@ -22,12 +22,11 @@ CheckBox {
                       ? Theme.accent
                       : (control.hovered ? Theme.textSecondary : Qt.rgba(0.5, 0.5, 0.5, 0.45))
 
-        Text {
+        AppIcon {
             anchors.centerIn: parent
-            text: "\u2713"
+            name: "check"
+            size: 12
             color: "white"
-            font.pixelSize: 12
-            font.bold: true
             visible: control.checked
         }
     }

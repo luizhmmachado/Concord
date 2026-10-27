@@ -15,9 +15,15 @@ SettingsController::SettingsController(SupabaseClient *client, QObject *parent)
         m_theme = row.value("theme").toString(m_theme);
         m_accentColor = row.value("accent_color").toString(m_accentColor);
         m_notificationsEnabled = row.value("notifications_enabled").toBool(m_notificationsEnabled);
-        m_inputDevice = row.value("input_device").toString();
-        m_outputDevice = row.value("output_device").toString();
-        m_videoDevice = row.value("video_device").toString();
+        const QString inputDevice = row.value("input_device").toString();
+        const QString outputDevice = row.value("output_device").toString();
+        const QString videoDevice = row.value("video_device").toString();
+        if (!inputDevice.isEmpty())
+            m_inputDevice = inputDevice;
+        if (!outputDevice.isEmpty())
+            m_outputDevice = outputDevice;
+        if (!videoDevice.isEmpty())
+            m_videoDevice = videoDevice;
         persistLocal();
         emit themeChanged();
         emit accentColorChanged();
@@ -64,6 +70,7 @@ void SettingsController::persistLocal()
     settings.setValue("outputDevice", m_outputDevice);
     settings.setValue("videoDevice", m_videoDevice);
     settings.endGroup();
+    settings.sync();
 }
 
 void SettingsController::persistRemote()

@@ -1,0 +1,30 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>call-hangup.svg</file>
+        <file>camera-off-16.svg</file>
+        <file>camera-off.svg</file>
+        <file>camera-on-16.svg</file>
+        <file>camera-on.svg</file>
+        <file>channel-text.svg</file>
+        <file>channel-voice.svg</file>
+        <file>check.svg</file>
+        <file>chevron-down.svg</file>
+        <file>close.svg</file>
+        <file>mail.svg</file>
+        <file>mic-off-16.svg</file>
+        <file>mic-off.svg</file>
+        <file>mic-on-16.svg</file>
+        <file>mic-on.svg</file>
+        <file>minus.svg</file>
+        <file>plus.svg</file>
+        <file>screen-share-off-16.svg</file>
+        <file>screen-share-off.svg</file>
+        <file>screen-share-on-16.svg</file>
+        <file>screen-share-on.svg</file>
+        <file>settings.svg</file>
+        <file>source-screen.svg</file>
+        <file>source-window.svg</file>
+        <file>status-online.svg</file>
+        <file>user-plus.svg</file>
+    </qresource>
+</RCC>

@@ -6,6 +6,7 @@ ComboBox {
     id: control
     implicitWidth: 180
     implicitHeight: 40
+    property string placeholderText: ""
 
     palette.window: Theme.surface
     palette.windowText: Theme.textPrimary
@@ -19,19 +20,19 @@ ComboBox {
     contentItem: Text {
         leftPadding: 12
         rightPadding: control.indicator.width + 12
-        text: control.displayText
+        text: control.count > 0 ? control.displayText : control.placeholderText
         font: control.font
-        color: Theme.textPrimary
+        color: control.count > 0 ? Theme.textPrimary : Theme.textSecondary
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
     }
 
-    indicator: Text {
+    indicator: AppIcon {
         x: control.width - width - 12
         y: control.topPadding + (control.availableHeight - height) / 2
-        text: "\u25be"
+        name: "chevron-down"
+        size: 12
         color: control.visualFocus ? Theme.accent : Theme.textSecondary
-        font.pixelSize: 12
         visible: !control.flat || control.down
     }
 

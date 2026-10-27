@@ -32,7 +32,7 @@ Rectangle {
                 radius: 32
                 color: Theme.accent
                 anchors.horizontalCenter: parent.horizontalCenter
-                Text { anchors.centerIn: parent; text: "✉"; font.pixelSize: 28; color: "white" }
+                AppIcon { anchors.centerIn: parent; name: "mail"; size: 28; color: "white" }
             }
 
             Text {

@@ -52,7 +52,7 @@ Rectangle {
             height: 48
             radius: 16
             color: root.directMessagesActive ? Theme.accent : Theme.surface
-            Text { anchors.centerIn: parent; text: "\u2709"; color: "white"; font.pixelSize: 20 }
+            AppIcon { anchors.centerIn: parent; name: "mail"; size: 20; color: "white" }
             MouseArea {
                 anchors.fill: parent
                 onClicked: root.directMessagesRequested()
@@ -64,7 +64,7 @@ Rectangle {
             height: 48
             radius: 16
             color: Theme.surface
-            Text { anchors.centerIn: parent; text: "+"; color: "white"; font.pixelSize: 22 }
+            AppIcon { anchors.centerIn: parent; name: "plus"; size: 22; color: "white" }
             MouseArea { anchors.fill: parent; onClicked: root.createServerRequested() }
         }
     }
@@ -77,7 +77,7 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottomMargin: 12
-        Text { anchors.centerIn: parent; text: "⚙"; color: "white"; font.pixelSize: 20 }
+        AppIcon { anchors.centerIn: parent; name: "settings"; size: 20; color: "white" }
         MouseArea { anchors.fill: parent; onClicked: root.settingsRequested() }
     }
 }

@@ -108,13 +108,13 @@ Rectangle {
             radius: Theme.radiusMedium
             color: Theme.surface
 
-            Column {
+            ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 16
-                spacing: 12
+                spacing: 10
 
                 Text {
-                    width: parent.width
+                    Layout.fillWidth: true
                     text: "Configura\u00e7\u00f5es"
                     color: Theme.textPrimary
                     font.bold: true
@@ -122,16 +122,23 @@ Rectangle {
                 }
 
                 Text {
-                    width: parent.width
+                    Layout.fillWidth: true
                     text: serverController.currentServerName
                     color: Theme.textSecondary
                     font.pixelSize: 12
                     elide: Text.ElideRight
                 }
 
-                Rectangle { width: parent.width; height: 1; color: Qt.rgba(1, 1, 1, 0.08) }
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 4
+                    Layout.bottomMargin: 4
+                    height: 1
+                    color: Qt.rgba(1, 1, 1, 0.08)
+                }
 
                 Text {
+                    Layout.fillWidth: true
                     text: "SERVIDOR"
                     color: Theme.textSecondary
                     font.pixelSize: 11
@@ -145,8 +152,8 @@ Rectangle {
                     ]
 
                     delegate: Rectangle {
-                        width: parent.width
-                        height: 36
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
                         radius: 8
                         visible: modelData.available
                         color: root.activeSection === modelData.key
@@ -154,33 +161,38 @@ Rectangle {
 
                         MouseArea {
                             anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
                             onClicked: root.selectSection(modelData.key)
                         }
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
+                            anchors.right: parent.right
                             anchors.leftMargin: 12
+                            anchors.rightMargin: 12
                             text: modelData.label
                             color: root.activeSection === modelData.key ? Theme.accent : Theme.textSecondary
                             font.bold: root.activeSection === modelData.key
                             font.pixelSize: 13
+                            elide: Text.ElideRight
                         }
                     }
                 }
 
                 Text {
+                    Layout.fillWidth: true
                     visible: root.errorMessage.length > 0
-                    width: parent.width
                     text: root.errorMessage
                     color: Theme.danger
                     font.pixelSize: 10
                     wrapMode: Text.WordWrap
                 }
 
-                Item { width: 1; height: 1 }
+                Item { Layout.fillHeight: true }
 
                 AppButton {
+                    Layout.fillWidth: true
                     text: "ESC  Voltar"
                     baseColor: Theme.surfaceAlt
                     textColor: Theme.textSecondary
