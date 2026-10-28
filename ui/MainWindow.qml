@@ -146,7 +146,20 @@ Rectangle {
         anchors.fill: parent
         color: Theme.background
         z: 10
-        SettingsPage { onCloseRequested: root.showSettings = false }
+        SettingsPage {
+            id: settingsPage
+            onCloseRequested: root.showSettings = false
+        }
+    }
+
+    Connections {
+        target: root
+        function onShowSettingsChanged() {
+            if (root.showSettings)
+                settingsPage.refreshMediaDevices()
+            else
+                settingsPage.stopMediaSessions()
+        }
     }
 
     Rectangle {

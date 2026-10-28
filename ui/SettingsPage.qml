@@ -13,6 +13,24 @@ Rectangle {
     signal closeRequested()
 
     property string activeSection: "account"
+    property real cameraAspect: 4 / 3
+    property int lastMicrophoneIndex: -1
+    property int lastSpeakerIndex: -1
+    property int lastCameraIndex: -1
+
+    function stopMediaSessions() {
+        mediaDeviceController.stopDeviceWatcher()
+        mediaDeviceController.stopMicrophoneMonitoring()
+        if (contentLoader.item && contentLoader.item.previewEnabled !== undefined)
+            contentLoader.item.previewEnabled = false
+    }
+
+    function refreshMediaDevices() {
+        if (activeSection === "voice") {
+            mediaDeviceController.refresh()
+            mediaDeviceController.startDeviceWatcher()
+        }
+    }
 
     function deviceIndex(list, value) {
         if (!list)
@@ -24,16 +42,44 @@ Rectangle {
         return -1
     }
 
+    function fallbackDeviceIndex(previousIndex, count) {
+        if (count <= 0)
+            return -1
+        if (previousIndex < 0)
+            return 0
+        return Math.min(previousIndex, count - 1)
+    }
+
     function ensureDeviceDefaults() {
-        if (mediaDeviceController.microphones.length > 0
-                && deviceIndex(mediaDeviceController.microphones, settingsController.inputDevice) < 0)
-            settingsController.inputDevice = mediaDeviceController.microphones[0]
-        if (mediaDeviceController.speakers.length > 0
-                && deviceIndex(mediaDeviceController.speakers, settingsController.outputDevice) < 0)
-            settingsController.outputDevice = mediaDeviceController.speakers[0]
-        if (mediaDeviceController.cameras.length > 0
-                && deviceIndex(mediaDeviceController.cameras, settingsController.videoDevice) < 0)
-            settingsController.videoDevice = mediaDeviceController.cameras[0]
+        var microphoneIds = mediaDeviceController.microphoneDeviceIds
+        if (microphoneIds.length > 0) {
+            var microphoneIndex = deviceIndex(microphoneIds, settingsController.inputDevice)
+            if (microphoneIndex < 0) {
+                microphoneIndex = fallbackDeviceIndex(lastMicrophoneIndex, microphoneIds.length)
+                settingsController.inputDevice = microphoneIds[microphoneIndex]
+            }
+            lastMicrophoneIndex = microphoneIndex
+        }
+
+        var speakerIds = mediaDeviceController.speakerDeviceIds
+        if (speakerIds.length > 0) {
+            var speakerIndex = deviceIndex(speakerIds, settingsController.outputDevice)
+            if (speakerIndex < 0) {
+                speakerIndex = fallbackDeviceIndex(lastSpeakerIndex, speakerIds.length)
+                settingsController.outputDevice = speakerIds[speakerIndex]
+            }
+            lastSpeakerIndex = speakerIndex
+        }
+
+        var cameraNames = mediaDeviceController.cameras
+        if (cameraNames.length > 0) {
+            var cameraIndex = deviceIndex(cameraNames, settingsController.videoDevice)
+            if (cameraIndex < 0) {
+                cameraIndex = fallbackDeviceIndex(lastCameraIndex, cameraNames.length)
+                settingsController.videoDevice = cameraNames[cameraIndex]
+            }
+            lastCameraIndex = cameraIndex
+        }
     }
 
     Component.onCompleted: {
@@ -428,6 +474,22 @@ Rectangle {
             id: voiceRoot
             property bool previewEnabled: false
 
+            function restartMicrophoneTest() {
+                if (mediaDeviceController.microphoneMonitoring)
+                    mediaDeviceController.startMicrophoneMonitoring(
+                                settingsController.inputDevice,
+                                settingsController.outputDevice)
+            }
+
+            Component.onCompleted: {
+                mediaDeviceController.refresh()
+                mediaDeviceController.startDeviceWatcher()
+            }
+            Component.onDestruction: {
+                mediaDeviceController.stopDeviceWatcher()
+                mediaDeviceController.stopMicrophoneMonitoring()
+            }
+
             spacing: 18
 
             RowLayout {
@@ -459,8 +521,15 @@ Rectangle {
             }
 
             Rectangle {
+                id: previewFrame
                 Layout.fillWidth: true
-                Layout.preferredHeight: 220
+                Layout.preferredHeight: {
+                    if (!voiceRoot.previewEnabled)
+                        return 220
+                    var frameWidth = voiceRoot.width > 0 ? voiceRoot.width : 640
+                    var aspect = root.cameraAspect > 0 ? root.cameraAspect : (4 / 3)
+                    return Math.max(180, Math.min(640, Math.round(frameWidth / aspect)))
+                }
                 radius: Theme.radiusMedium
                 color: Theme.surface
                 border.width: 1
@@ -561,10 +630,44 @@ Rectangle {
                         AppComboBox {
                             Layout.fillWidth: true
                             model: mediaDeviceController.microphones
-                            currentIndex: root.deviceIndex(model, settingsController.inputDevice)
+                            currentIndex: root.deviceIndex(mediaDeviceController.microphoneDeviceIds, settingsController.inputDevice)
                             placeholderText: "Nenhum dispositivo encontrado"
-                            onActivated: if (currentIndex >= 0) settingsController.inputDevice = model[currentIndex]
+                            onActivated: {
+                                if (currentIndex >= 0) {
+                                    settingsController.inputDevice = mediaDeviceController.microphoneDeviceIds[currentIndex]
+                                    voiceRoot.restartMicrophoneTest()
+                                }
+                            }
                         }
+                        AppButton {
+                            text: mediaDeviceController.microphoneMonitoring ? "Parar" : "Testar"
+                            iconName: mediaDeviceController.microphoneMonitoring ? "mic-off" : "mic-on"
+                            baseColor: mediaDeviceController.microphoneMonitoring ? Theme.surfaceAlt : Theme.accent
+                            textColor: mediaDeviceController.microphoneMonitoring ? Theme.textPrimary : Theme.surfaceAlt
+                            enabled: mediaDeviceController.microphones.length > 0
+                                     && mediaDeviceController.speakers.length > 0
+                            onClicked: {
+                                if (mediaDeviceController.microphoneMonitoring)
+                                    mediaDeviceController.stopMicrophoneMonitoring()
+                                else
+                                    mediaDeviceController.startMicrophoneMonitoring(
+                                                settingsController.inputDevice,
+                                                settingsController.outputDevice)
+                            }
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        visible: mediaDeviceController.microphoneMonitoring
+                                || mediaDeviceController.microphoneMonitorError.length > 0
+                        text: mediaDeviceController.microphoneMonitoring
+                              ? "Escutando o microfone selecionado. Use fones de ouvido para evitar microfonia."
+                              : mediaDeviceController.microphoneMonitorError
+                        color: mediaDeviceController.microphoneMonitoring
+                               ? Theme.textSecondary : Theme.danger
+                        font.pixelSize: 12
+                        wrapMode: Text.WordWrap
                     }
 
                     RowLayout {
@@ -580,9 +683,14 @@ Rectangle {
                         AppComboBox {
                             Layout.fillWidth: true
                             model: mediaDeviceController.speakers
-                            currentIndex: root.deviceIndex(model, settingsController.outputDevice)
+                            currentIndex: root.deviceIndex(mediaDeviceController.speakerDeviceIds, settingsController.outputDevice)
                             placeholderText: "Nenhum dispositivo encontrado"
-                            onActivated: if (currentIndex >= 0) settingsController.outputDevice = model[currentIndex]
+                            onActivated: {
+                                if (currentIndex >= 0) {
+                                    settingsController.outputDevice = mediaDeviceController.speakerDeviceIds[currentIndex]
+                                    voiceRoot.restartMicrophoneTest()
+                                }
+                            }
                         }
                     }
 
@@ -631,7 +739,17 @@ Rectangle {
             VideoOutput {
                 anchors.fill: parent
                 source: previewCamera
-                fillMode: VideoOutput.PreserveAspectCrop
+                fillMode: VideoOutput.PreserveAspectFit
+            }
+
+            Binding {
+                target: root
+                property: "cameraAspect"
+                value: previewCamera.viewfinder.resolution.height > 0
+                       ? previewCamera.viewfinder.resolution.width
+                         / previewCamera.viewfinder.resolution.height
+                       : 4 / 3
+                when: previewCamera.viewfinder.resolution.height > 0
             }
 
             Component.onCompleted: previewCamera.start()
